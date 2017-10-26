@@ -103,9 +103,9 @@ class VDSN():
         tf.summary.scalar('gen_total_cost', gen_total_cost)
         tf.summary.scalar('dis_cost_tf', dis_cost_tf)
         tf.summary.scalar('dis_total_cost_tf', dis_total_cost_tf)
-        tf.summary.scalar('dis_prediction_max', max(dis_prediction_left[0],dis_prediction_right[0]))
-        tf.summary.scalar('dis_prediction_mean', (dis_prediction_left[1]+dis_prediction_right[1])/2 )
-        tf.summary.scalar('dis_prediction_min', min(dis_prediction_left[2],dis_prediction_right[2]) )
+        tf.summary.scalar('dis_prediction_max', tf.reduce_max([dis_prediction_left[0], dis_prediction_right[0]]))
+        tf.summary.scalar('dis_prediction_mean', (dis_prediction_left[1] + dis_prediction_right[1])/2 )
+        tf.summary.scalar('dis_prediction_min', tf.reduce_min([(dis_prediction_left[2], dis_prediction_right[2])]))
 
 
         return Y, image_real_left, image_real_right, gen_recon_cost, gen_disentangle_cost, gen_total_cost, \
