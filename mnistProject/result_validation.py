@@ -15,8 +15,8 @@ def validate_F_V_classification_fail(conf):
     check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"])
     train_logs_dir = check_create_dir(conf["logs_dir_root"]
                       + conf["F_V_validation_logs_dir_root"]+conf["time_dir"]+'/')
-    test_logs_dir = check_create_dir(conf["logs_dir_root"]
-                     + conf["F_V_validation_logs_dir_root"]+'test/')
+    # test_logs_dir = check_create_dir(conf["logs_dir_root"]
+    #                  + conf["F_V_validation_logs_dir_root"]+'test/')
 
     F_V_validation_model = F_V_validation(
         batch_size=conf["batch_size"],
