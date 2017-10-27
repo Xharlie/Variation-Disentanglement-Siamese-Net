@@ -20,6 +20,9 @@ parser.add_argument("--batch_size", nargs='?', type=int, default=128,
 parser.add_argument("--n_epochs", nargs='?', type=int, default=100,
                     help="number of epochs")
 
+parser.add_argument("--gen_odds", nargs='?', type=int, default=100,
+                    help="how many time the generator can train once")
+
 parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
                     help="how many steps to draw a comparision pic")
 
@@ -129,7 +132,6 @@ train_op_discrim = tf.train.AdamOptimizer(
     dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
 
 iterations = 0
-k = 2
 save_path=""
 
 with tf.Session(config=tf.ConfigProto()) as sess:
@@ -160,7 +162,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
 
             Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1]) / 255.
 
-            if np.mod( iterations, k ) != 0:
+            if np.mod( iterations, args.gen_odds ) == 0:
                 _, summary, gen_recon_cost_val, gen_disentangle_val, gen_total_cost_val, \
                         dis_prediction_val_left, dis_prediction_val_right \
                     = sess.run(

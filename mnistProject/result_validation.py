@@ -45,7 +45,7 @@ def validate_F_V_classification_fail(conf):
     with tf.Session(config=tf.ConfigProto()) as sess:
         sess.run(tf.global_variables_initializer())
         training_writer = tf.summary.FileWriter(train_logs_dir, sess.graph)
-        test_writer = tf.summary.FileWriter(test_logs_dir, sess.graph)
+        # test_writer = tf.summary.FileWriter(test_logs_dir, sess.graph)
         train_merged_summary = tf.summary.merge_all('train')
         validation_merged_summary = tf.summary.merge_all('validation')
         test_merged_summary = tf.summary.merge_all('test')
@@ -141,8 +141,8 @@ def validate_F_V_classification_fail(conf):
         dis_total_cost_val_list = []
         accuracy_val_list = []
         for start, end in zip(
-                range(0, len(vaY), conf["F_V_validation_test_batch_size"]),
-                range(conf["F_V_validation_test_batch_size"], len(vaY), conf["F_V_validation_test_batch_size"])
+                range(0, len(teY), conf["F_V_validation_test_batch_size"]),
+                range(conf["F_V_validation_test_batch_size"], len(teY), conf["F_V_validation_test_batch_size"])
         ):
             Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
             Ys = OneHot(teY[start:end], 10)
