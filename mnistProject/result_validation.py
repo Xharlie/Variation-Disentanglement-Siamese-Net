@@ -241,6 +241,6 @@ if __name__ == "__main__":
         "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
         "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
         "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
-        "time":args.time_dir
+        "time_dir":args.time_dir
     }
     validate_F_V_classification_fail(F_V_classification_conf)
