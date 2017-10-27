@@ -153,10 +153,10 @@ class VDSN():
         h2 = tf.nn.relu(batchnormalize(tf.matmul(h1, self.gen_W2)))
         h2 = tf.reshape(h2, [-1,7,7,self.dim_W2])
 
-        output_shape_l3 = [self.batch_size,14,14,self.dim_W3]
+        output_shape_l3 = [tf.shape(h2)[0],14,14,self.dim_W3]
         h3 = tf.nn.conv2d_transpose(h2, self.gen_W3, output_shape=output_shape_l3, strides=[1,2,2,1])
-        h3 = tf.nn.relu( batchnormalize(h3) )
-        output_shape_l4 = [self.batch_size,28,28,self.image_shape[-1]]
+        h3 = tf.nn.relu(batchnormalize(h3))
+        output_shape_l4 = [tf.shape(h3)[0],28,28,self.image_shape[-1]]
         h4 = tf.nn.conv2d_transpose(h3, self.gen_W4, output_shape=output_shape_l4, strides=[1,2,2,1])
         return h4
 

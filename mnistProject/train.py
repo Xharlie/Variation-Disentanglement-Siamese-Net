@@ -8,7 +8,10 @@ import argparse
 import result_validation
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--learning_rate", nargs='?', type=float, default=0.0002,
+parser.add_argument("--gen_learning_rate", nargs='?', type=float, default=0.0002,
+                    help="learning rate")
+
+parser.add_argument("--dis_learning_rate", nargs='?', type=float, default=0.0002,
                     help="learning rate")
 
 parser.add_argument("--batch_size", nargs='?', type=int, default=128,
@@ -32,11 +35,8 @@ parser.add_argument("--gen_disentangle_weight", nargs='?', type=float, default=1
 parser.add_argument("--logs_dir_root", nargs='?', type=str, default='tensorflow_log/',
                     help="root dir to save training summary")
 
-parser.add_argument("--training_logs_dir_parent", nargs='?', type=str, default='tensorflow_log/train/',
-                    help="root dir to save training summary")
-
-parser.add_argument("--test_logs_dir_parent", nargs='?', type=str, default='tensorflow_log/test/',
-                    help="root dir to save test summary")
+parser.add_argument("--main_logs_dir_root", nargs='?', type=str, default='main/',
+                    help="root dir inside logs_dir_root to save main summary")
 
 parser.add_argument("--model_dir_parent", nargs='?', type=str, default='model_treasury/',
                     help="root dir to save model")
@@ -47,15 +47,29 @@ parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='vis/',
 parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                     help="which gpu to use")
 
+# >==================  F_V_validation args =======================<
+
+parser.add_argument("--F_V_validation_logs_dir_root", nargs='?', type=str, default='F_V_validation/',
+                    help="root dir inside logs_dir_root to save F_V_validation summary")
+
 parser.add_argument("--validate_disentanglement", action="store_true",
                     help="run F_V disentanglement classification task")
 
+parser.add_argument("--F_V_validation_n_epochs", nargs='?', type=int, default=100,
+                    help="number of epochs for F_V_validation")
+
+parser.add_argument("--F_V_validation_learning_rate", nargs='?', type=float, default=0.0002,
+                    help="learning rate for F_V_validation")
+
+parser.add_argument("--F_V_validation_test_batch_size", nargs='?', type=int, default=1000,
+                    help="F V validation's test_batch_size")
 
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
 n_epochs = args.n_epochs
-learning_rate = args.learning_rate
+gen_learning_rate = args.gen_learning_rate
+dis_learning_rate = args.dis_learning_rate
 batch_size = args.batch_size
 image_shape = [28,28,1]
 # amount of class label
@@ -70,16 +84,14 @@ gen_regularizer_weight = args.gen_regularizer_weight
 dis_regularizer_weight = args.dis_regularizer_weight
 # if we don't have these directory, create them
 check_create_dir(args.logs_dir_root)
-check_create_dir(args.training_logs_dir_parent)
-check_create_dir(args.test_logs_dir_parent)
+check_create_dir(args.logs_dir_root + args.main_logs_dir_root)
 check_create_dir(args.model_dir_parent)
 check_create_dir(args.pic_dir_parent)
 
-training_logs_dir = check_create_dir(args.training_logs_dir_parent + time_dir + '/')
-test_logs_dir = check_create_dir(args.test_logs_dir_parent + time_dir + '/')
+training_logs_dir = check_create_dir(args.logs_dir_root + args.main_logs_dir_root + time_dir + '/')
 model_dir = check_create_dir(args.model_dir_parent + time_dir + '/')
 
-visualize_dim=batch_size
+visualize_dim = batch_size
 drawing_step = args.drawing_step
 
 # train image validation image, test image, train label, validation label, test label
@@ -110,10 +122,11 @@ gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
 # include en_* and encoder_* W and b,
 encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
 
-train_op_discrim = tf.train.AdamOptimizer(
-    learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
 train_op_gen = tf.train.AdamOptimizer(
-    learning_rate, beta1=0.5).minimize(gen_total_cost_tf, var_list=gen_vars + encoder_vars, global_step=global_step)
+    gen_learning_rate, beta1=0.5).minimize(gen_total_cost_tf, var_list=gen_vars + encoder_vars, global_step=global_step)
+
+train_op_discrim = tf.train.AdamOptimizer(
+    dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
 
 iterations = 0
 k = 2
@@ -123,7 +136,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
     sess.run(tf.global_variables_initializer())
     # writer for tensorboard summary
     training_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
-    test_writer = tf.summary.FileWriter(test_logs_dir, sess.graph)
+    # test_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
     merged_summary = tf.summary.merge_all()
 
     for epoch in range(n_epochs):
@@ -219,11 +232,17 @@ F_V_classification_conf = {
     "teY": teY,
     "batch_size":batch_size,
     "image_shape":image_shape,
-    "dim_y:":dim_y,
-    "dim_W1":dim_W1,
-    "dim_W2":dim_W2,
-    "dim_W3":dim_W3,
-    "dim_F_I":dim_F_I
+    "dim_y:": dim_y,
+    "dim_W1": dim_W1,
+    "dim_W2": dim_W2,
+    "dim_W3": dim_W3,
+    "dim_F_I": dim_F_I,
+    "dis_regularizer_weight": args.dis_regularizer_weight,
+    "logs_dir_root": args.logs_dir_root,
+    "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
+    "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
+    "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
+    "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size
 }
 
 if args.validate_disentanglement:

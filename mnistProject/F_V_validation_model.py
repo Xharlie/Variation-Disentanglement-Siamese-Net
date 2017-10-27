@@ -16,13 +16,14 @@ class F_V_validation(model.VDSN):
             dim_W3=64,
             dim_F_I=512,
     ):
-        super(F_V_validation, self).__init__(batch_size,
-            image_shape=[28, 28, 1],
-            dim_y=10,
-            dim_W1=1024,
-            dim_W2=128,
-            dim_W3=64,
-            dim_F_I=512)
+        super(F_V_validation, self).__init__(
+            batch_size=batch_size,
+            image_shape=image_shape,
+            dim_y=dim_y,
+            dim_W1=dim_W1,
+            dim_W2=dim_W2,
+            dim_W3=dim_W3,
+            dim_F_I=dim_F_I)
 
         # should be inited by super's __init__
         # self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
@@ -61,12 +62,14 @@ class F_V_validation(model.VDSN):
 
         dis_cost_tf = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_logits))
         dis_total_cost_tf = dis_cost_tf + dis_regularizer_weight * dis_regularization_loss
+        correct_prediction = tf.equal(tf.argmax(Y_prediction_prob, 1), tf.argmax(Y, 1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
+        tf.summary.scalar('dis_cost_tf', dis_cost_tf, collections=['train','test','validation'])
+        tf.summary.scalar('dis_total_cost_tf', dis_total_cost_tf, collections=['train','test','validation'])
+        tf.summary.scalar('accuracy', accuracy, collections=['train','test','validation'])
 
-        tf.summary.scalar('dis_cost_tf', dis_cost_tf)
-        tf.summary.scalar('dis_total_cost_tf', dis_total_cost_tf)
-
-        return Y, image_real, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob
+        return Y, image_real, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob, accuracy
 
     # def encoder(self, image):
     #     # First convolutional layer - maps one grayscale image to 64 feature maps.
