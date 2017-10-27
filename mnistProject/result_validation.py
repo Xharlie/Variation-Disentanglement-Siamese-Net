@@ -11,23 +11,23 @@ make sure it cannot train out the Identity
 
 def validate_F_V_classification_fail(conf):
 
-    check_create_dir(conf.logs_dir_root)
-    check_create_dir(conf.logs_dir_root + conf.F_V_validation_logs_dir_root)
-    train_logs_dir = check_create_dir(conf.logs_dir_root + conf.F_V_validation_logs_dir_root+'train/')
-    test_logs_dir = check_create_dir(conf.logs_dir_root + conf.F_V_validation_logs_dir_root+'test/')
+    check_create_dir(conf["logs_dir_root"])
+    check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"])
+    train_logs_dir = check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"]+'train/')
+    test_logs_dir = check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"]+'test/')
 
     F_V_validation_model = F_V_validation(
-        batch_size=conf.batch_size,
-        image_shape=conf.image_shape,
-        dim_y=conf.dim_y,
-        dim_W1=conf.dim_W1,
-        dim_W2=conf.dim_W2,
-        dim_W3=conf.dim_W3,
-        dim_F_I=conf.dim_F_I
+        batch_size=conf["batch_size"],
+        image_shape=conf["image_shape"],
+        dim_y=conf["dim_y"],
+        dim_W1=conf["dim_W1"],
+        dim_W2=conf["dim_W2"],
+        dim_W3=conf["dim_W3"],
+        dim_F_I=conf["dim_F_I"]
     )
 
     Y_tf, image_real_tf, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob_tf,accuracy_tf \
-        = F_V_validation_model.build_model(conf.dis_regularizer_weight)
+        = F_V_validation_model.build_model(conf["dis_regularizer_weight"])
 
     global_step = tf.Variable(0, trainable=False)
 
@@ -36,7 +36,7 @@ def validate_F_V_classification_fail(conf):
     # include en_* and encoder_* W and b,
     encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
 
-    train_op = tf.train.AdamOptimizer(conf.F_V_validation_learning_rate, beta1=0.5) \
+    train_op = tf.train.AdamOptimizer(conf["F_V_validation_learning_rate"], beta1=0.5) \
         .minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
     iterations = 0
 
@@ -48,27 +48,27 @@ def validate_F_V_classification_fail(conf):
         validation_merged_summary = tf.summary.merge_all('validation')
         test_merged_summary = tf.summary.merge_all('test')
 
-        if (len(conf.save_path)>0):
+        if (len(conf["save_path"])>0):
             # Create a saver. include gen_vars and encoder_vars
             saver = tf.train.Saver(gen_vars + encoder_vars)
-            saver.restore(sess, conf.save_path)
+            saver.restore(sess, conf["save_path"])
 
-        trX = conf.trX
-        trY = conf.trY
-        vaX = conf.vaX
-        vaY = conf.vaY
-        teX = conf.teX
-        teY = conf.teY
+        trX = conf["trX"]
+        trY = conf["trY"]
+        vaX = conf["vaX"]
+        vaY = conf["vaY"]
+        teX = conf["teX"]
+        teY = conf["teY"]
 
-        for epoch in range(conf.F_V_validation_n_epochs):
-            index = np.arange(len(conf.trY))
+        for epoch in range(conf["F_V_validation_n_epochs"]):
+            index = np.arange(len(conf["trY"]))
             np.random.shuffle(index)
             trX = trX[index]
             trY = trY[index]
 
             for start, end in zip(
-                    range(0, len(trY), conf.batch_size),
-                    range(conf.batch_size, len(trY), conf.batch_size)
+                    range(0, len(trY), conf["batch_size"]),
+                    range(conf["batch_size"], len(trY), conf["batch_size"])
             ):
                 # pixel value normalized -> from 0 to 1
                 Xs = trX[start:end].reshape([-1, 28, 28, 1]) / 255.
@@ -95,8 +95,9 @@ def validate_F_V_classification_fail(conf):
             dis_total_cost_val_list=[]
             accuracy_val_list=[]
             for start, end in zip(
-                    range(0, len(vaY), conf.F_V_validation_test_batch_size),
-                    range(conf.F_V_validation_test_batch_size, len(vaY), conf.F_V_validation_test_batch_size)
+                    range(0, len(vaY), conf["F_V_validation_test_batch_size"]),
+                    range(conf["F_V_validation_test_batch_size"], len(vaY),  \
+                    conf["F_V_validation_test_batch_size"])
             ):
                 Xs = vaX[start:end].reshape([-1, 28, 28, 1]) / 255.
                 Ys = OneHot(vaY[start:end], 10)
@@ -138,8 +139,8 @@ def validate_F_V_classification_fail(conf):
         dis_total_cost_val_list = []
         accuracy_val_list = []
         for start, end in zip(
-                range(0, len(vaY), conf.F_V_validation_test_batch_size),
-                range(conf.F_V_validation_test_batch_size, len(vaY), conf.F_V_validation_test_batch_size)
+                range(0, len(vaY), conf["F_V_validation_test_batch_size"]),
+                range(conf["F_V_validation_test_batch_size"], len(vaY), conf["F_V_validation_test_batch_size"])
         ):
             Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
             Ys = OneHot(teY[start:end], 10)
@@ -204,7 +205,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--F_V_validation_test_batch_size", nargs='?', type=int, default=1000,
                         help="F V validation's test_batch_size")
-    
+
     parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                         help="which gpu to use")
 
@@ -236,4 +237,4 @@ if __name__ == "__main__":
         "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
         "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
     }
-    validate_F_V_classification_fail()
+    validate_F_V_classification_fail(F_V_classification_conf)
