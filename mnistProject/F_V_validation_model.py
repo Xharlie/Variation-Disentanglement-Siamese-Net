@@ -11,10 +11,10 @@ class F_V_validation(model.VDSN):
             batch_size=100,
             image_shape=[28, 28, 1],
             dim_y=10,
-            dim_W1=1024,
+            dim_W1=128,
             dim_W2=128,
             dim_W3=64,
-            dim_F_I=512,
+            dim_F_I=64,
     ):
         super(F_V_validation, self).__init__(
             batch_size=batch_size,
@@ -51,7 +51,7 @@ class F_V_validation(model.VDSN):
         #  F_I for identity representation
         F_I, F_V = tf.split(h_fc1, num_or_size_splits=2, axis=1)
 
-        Y_logits = self.discriminate(F_V)
+        Y_logits = self.discriminator(F_V)
         Y_prediction_prob = tf.nn.softmax(Y_logits)
 
         discriminator_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
@@ -98,12 +98,12 @@ class F_V_validation(model.VDSN):
     #
     #     return h_fc1
 
-    def discriminate(self, F_V):
-        # 512 to 512
-        h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
-        # 512 to 10
-        h2 = lrelu(batchnormalize(tf.matmul(h1, self.discrim_W2) + self.discrim_b2))
-        return h2
+    # def discriminator(self, F_V):
+    #     # 512 to 512
+    #     h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
+    #     # 512 to 10
+    #     h2 = lrelu(batchnormalize(tf.matmul(h1, self.discrim_W2) + self.discrim_b2))
+    #     return h2
 
     # def generator(self, F_I, F_V):
     #     F_combine = tf.concat(axis=1, values=[F_I, F_V])

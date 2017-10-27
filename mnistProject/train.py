@@ -6,6 +6,8 @@ from load import mnist_with_valid_set
 from time import localtime, strftime
 import argparse
 import result_validation
+import json
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--gen_learning_rate", nargs='?', type=float, default=0.0002,
@@ -16,6 +18,22 @@ parser.add_argument("--dis_learning_rate", nargs='?', type=float, default=0.0002
 
 parser.add_argument("--batch_size", nargs='?', type=int, default=128,
                     help="batch_size")
+
+parser.add_argument("--dim_y", nargs='?', type=int, default=10,
+                    help="dimension of digit")
+
+parser.add_argument("--dim_W1", nargs='?', type=int, default=128,
+                    help="dimension of last encoder layer")
+
+parser.add_argument("--dim_W2", nargs='?', type=int, default=128,
+                    help="dimension of second encoder layer ")
+
+parser.add_argument("--dim_W3", nargs='?', type=int, default=64,
+                    help="dimension of first encoder layer ")
+
+parser.add_argument("--dim_F_I", nargs='?', type=int, default=64,
+                    help="dimension of Identity representation, " +
+                         "the dimension of Variation respresentation is dim_W1-dim_F_I")
 
 parser.add_argument("--n_epochs", nargs='?', type=int, default=100,
                     help="number of epochs")
@@ -50,6 +68,9 @@ parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='vis/',
 parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                     help="which gpu to use")
 
+parser.add_argument("--simple_discriminator", action="store_false",
+                    help="simple_discriminator indicate use one fc layer for discriminator")
+
 # >==================  F_V_validation args =======================<
 
 parser.add_argument("--F_V_validation_logs_dir_root", nargs='?', type=str, default='F_V_validation/',
@@ -77,10 +98,10 @@ batch_size = args.batch_size
 image_shape = [28,28,1]
 # amount of class label
 dim_y=10
-dim_W1 = 1024
+dim_W1 = 128
 dim_W2 = 128
 dim_W3 = 64
-dim_F_I= 512
+dim_F_I= 64
 time_dir = strftime("%Y-%m-%d-%H-%M-%S", localtime())
 gen_disentangle_weight = args.gen_disentangle_weight
 gen_regularizer_weight = args.gen_regularizer_weight
@@ -107,7 +128,8 @@ VDSN_model = VDSN(
         dim_W1=dim_W1,
         dim_W2=dim_W2,
         dim_W3=dim_W3,
-        dim_F_I=dim_F_I
+        dim_F_I=dim_F_I,
+        simple_discriminator=args.simple_discriminator,
 )
 
 Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
@@ -135,94 +157,107 @@ iterations = 0
 save_path=""
 
 with tf.Session(config=tf.ConfigProto()) as sess:
-    sess.run(tf.global_variables_initializer())
-    # writer for tensorboard summary
-    training_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
-    # test_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
-    merged_summary = tf.summary.merge_all()
+    try:
+        sess.run(tf.global_variables_initializer())
+        # writer for tensorboard summary
+        training_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
+        # test_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
+        merged_summary = tf.summary.merge_all()
 
-    for epoch in range(n_epochs):
-        index = np.arange(len(trY))
-        np.random.shuffle(index)
-        trX = trX[index]
-        trY = trY[index]
+        for epoch in range(n_epochs):
+            index = np.arange(len(trY))
+            np.random.shuffle(index)
+            trX = trX[index]
+            trY = trY[index]
 
-        indexTable = [[] for i in range(10)]
-        for index in range(len(trY)):
-            indexTable[trY[index]].append(index)
+            indexTable = [[] for i in range(10)]
+            for index in range(len(trY)):
+                indexTable[trY[index]].append(index)
 
-        for start, end in zip(
-                range(0, len(trY), batch_size),
-                range(batch_size, len(trY), batch_size)
-                ):
+            for start, end in zip(
+                    range(0, len(trY), batch_size),
+                    range(batch_size, len(trY), batch_size)
+                    ):
 
-            # pixel value normalized -> from 0 to 1
-            Xs_left = trX[start:end].reshape( [-1, 28, 28, 1]) / 255.
-            Ys = OneHot(trY[start:end],10)
+                # pixel value normalized -> from 0 to 1
+                Xs_left = trX[start:end].reshape( [-1, 28, 28, 1]) / 255.
+                Ys = OneHot(trY[start:end],10)
 
-            Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1]) / 255.
+                Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1]) / 255.
 
-            if np.mod( iterations, args.gen_odds ) == 0:
-                _, summary, gen_recon_cost_val, gen_disentangle_val, gen_total_cost_val, \
-                        dis_prediction_val_left, dis_prediction_val_right \
-                    = sess.run(
-                        [train_op_gen, merged_summary, g_recon_cost_tf, gen_disentangle_cost_tf, gen_total_cost_tf,
-                         dis_prediction_tf_left, dis_prediction_tf_right],
-                        feed_dict={
-                            Y_tf:Ys,
-                            image_tf_real_left: Xs_left,
-                            image_tf_real_right: Xs_right
+                if np.mod( iterations, args.gen_odds ) == 0:
+                    _, summary, gen_recon_cost_val, gen_disentangle_val, gen_total_cost_val, \
+                            dis_prediction_val_left, dis_prediction_val_right \
+                        = sess.run(
+                            [train_op_gen, merged_summary, g_recon_cost_tf, gen_disentangle_cost_tf, gen_total_cost_tf,
+                             dis_prediction_tf_left, dis_prediction_tf_right],
+                            feed_dict={
+                                Y_tf:Ys,
+                                image_tf_real_left: Xs_left,
+                                image_tf_real_right: Xs_right
                             })
-                training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-                print("=========== updating G ==========")
-                print("iteration:", iterations)
-                print("gen reconstruction loss:", gen_recon_cost_val)
-                print("gen disentanglement loss :", gen_disentangle_val)
-                print("total weigthted gen loss :", gen_total_cost_val)
-                print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
-                print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
+                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                    print("=========== updating G ==========")
+                    print("iteration:", iterations)
+                    print("gen reconstruction loss:", gen_recon_cost_val)
+                    print("gen disentanglement loss :", gen_disentangle_val)
+                    print("total weigthted gen loss :", gen_total_cost_val)
+                    print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
+                    print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
 
-            else:
-                _, summary, dis_cost_val, dis_total_cost_val, \
-                        dis_prediction_val_left, dis_prediction_val_right \
-                    = sess.run(
-                        [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf, \
-                         dis_prediction_tf_left, dis_prediction_tf_right],
-                        feed_dict={
-                            Y_tf:Ys,
-                            image_tf_real_left: Xs_left,
-                            image_tf_real_right: Xs_right
-                            })
-                training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-                print("=========== updating D ==========")
-                print("iteration:", iterations)
-                print("discriminator loss:", dis_cost_val)
-                print("discriminator total weigthted loss:", dis_total_cost_val)
-                print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
-                print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
+                else:
+                    _, summary, dis_cost_val, dis_total_cost_val, \
+                            dis_prediction_val_left, dis_prediction_val_right \
+                        = sess.run(
+                            [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf, \
+                             dis_prediction_tf_left, dis_prediction_tf_right],
+                            feed_dict={
+                                Y_tf:Ys,
+                                image_tf_real_left: Xs_left,
+                                image_tf_real_right: Xs_right
+                                })
+                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                    print("=========== updating D ==========")
+                    print("iteration:", iterations)
+                    print("discriminator loss:", dis_cost_val)
+                    print("discriminator total weigthted loss:", dis_total_cost_val)
+                    print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
+                    print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
 
 
-            if np.mod(iterations, drawing_step) == 0:
-                indexTableVal = [[] for i in range(10)]
-                for index in range(len(vaY)):
-                    indexTableVal[vaY[index]].append(index)
-                corrRightVal = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
-                image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
-                generated_samples_left = sess.run(
-                        image_gen_left,
-                        feed_dict={
-                            image_tf_real_left: image_real_left,
-                            image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
-                            })
-                # since 16 * 8  = batch size * 2
-                save_visualization(image_real_left, generated_samples_left, (16,8), save_path=args.pic_dir_parent+'sample_%04d.jpg' % int(iterations))
+                if np.mod(iterations, drawing_step) == 0:
+                    indexTableVal = [[] for i in range(10)]
+                    for index in range(len(vaY)):
+                        indexTableVal[vaY[index]].append(index)
+                    corrRightVal = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
+                    image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
+                    generated_samples_left = sess.run(
+                            image_gen_left,
+                            feed_dict={
+                                image_tf_real_left: image_real_left,
+                                image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
+                                })
+                    # since 16 * 8  = batch size * 2
+                    save_visualization(image_real_left, generated_samples_left, (16,8), save_path=args.pic_dir_parent+'sample_%04d.jpg' % int(iterations))
 
-            iterations += 1
+                iterations += 1
 
-    # Save the variables to disk.
-    save_path = saver.save(sess, "{}{}_{}_{}_{}.ckpt".format(model_dir,
-        gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
-    print("Model saved in file: %s" % save_path)
+        # Save the variables to disk.
+        save_path = saver.save(sess, "{}{}_{}_{}_{}.ckpt".format(model_dir,
+            gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
+        print("Model saved in file: %s" % save_path)
+
+    except KeyboardInterrupt:
+        print("Manual interrupt occurred.")
+        print('Done training for {} steps'.format(iterations))
+        save_path = saver.save(sess, "{}{}_{}_{}_{}.ckpt".format(model_dir,
+            gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
+        print("Model saved in file: %s" % save_path)
+
+        with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
+            file.write(json.dumps(args))
+        with open(model_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
+            file.write(json.dumps(args))
 
 F_V_classification_conf = {
     "save_path": save_path,
@@ -232,8 +267,8 @@ F_V_classification_conf = {
     "vaY": vaY,
     "teX": teX,
     "teY": teY,
-    "batch_size":batch_size,
-    "image_shape":image_shape,
+    "batch_size": batch_size,
+    "image_shape": image_shape,
     "dim_y": dim_y,
     "dim_W1": dim_W1,
     "dim_W2": dim_W2,
@@ -248,5 +283,12 @@ F_V_classification_conf = {
     "time_dir":time_dir
 }
 
+with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
+    file.write(json.dumps(args))
+
+with open(model_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
+    file.write(json.dumps(args))
+
 if args.validate_disentanglement:
+    tf.reset_default_graph()
     result_validation.validate_F_V_classification_fail(F_V_classification_conf)

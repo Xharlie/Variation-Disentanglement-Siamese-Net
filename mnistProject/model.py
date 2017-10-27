@@ -11,10 +11,11 @@ class VDSN(object):
             batch_size=100,
             image_shape=[28,28,1],
             dim_y=10,
-            dim_W1=1024,
+            dim_W1=128,
             dim_W2=128,
             dim_W3=64,
-            dim_F_I=512,
+            dim_F_I=64,
+            simple_discriminator=True
             ):
 
         self.batch_size = batch_size
@@ -25,15 +26,19 @@ class VDSN(object):
         self.dim_W1 = dim_W1
         self.dim_W2 = dim_W2
         self.dim_W3 = dim_W3
+        self.simple_discriminator = simple_discriminator
+
 
         self.gen_W1 = tf.Variable(tf.random_normal([dim_W1, dim_W1], stddev=0.02), name='gen_W1')
         self.gen_W2 = tf.Variable(tf.random_normal([dim_W1, dim_W2*7*7], stddev=0.02), name='gen_W2')
         self.gen_W3 = tf.Variable(tf.random_normal([5,5,dim_W3,dim_W2], stddev=0.02), name='gen_W3')
         self.gen_W4 = tf.Variable(tf.random_normal([5,5,image_shape[-1],dim_W3], stddev=0.02), name='gen_W4')
 
-        self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
+        if not self.simple_discriminator:
+            self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
+            self.discrim_b1 = bias_variable([self.dim_F_V], name='dis_b1')
+
         self.discrim_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_y], stddev=0.02), name='discrim_W2')
-        self.discrim_b1 = bias_variable([self.dim_F_V], name='dis_b1')
         self.discrim_b2 = bias_variable([self.dim_y], name='dis_b2')
 
         self.encoder_W1 = tf.Variable(tf.random_normal([5, 5, image_shape[-1] , dim_W3], stddev=0.02),name='encoder_W1')
@@ -66,8 +71,8 @@ class VDSN(object):
         image_gen_left = tf.nn.sigmoid(h4_left)
         image_gen_right = tf.nn.sigmoid(h4_right)
 
-        Y_logits_left = self.discriminate(F_V_left)
-        Y_logits_right = self.discriminate(F_V_right)
+        Y_logits_left = self.discriminator(F_V_left)
+        Y_logits_right = self.discriminator(F_V_right)
 
         Y_result_left = tf.reduce_sum(Y * tf.nn.softmax(Y_logits_left), axis=1)
         Y_result_right = tf.reduce_sum(Y * tf.nn.softmax(Y_logits_right), axis=1)
@@ -139,11 +144,13 @@ class VDSN(object):
 
         return h_fc1
 
-    def discriminate(self, F_V):
+    def discriminator(self, F_V):
         # 512 to 512
-        h1 = lrelu( batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
-        # 512 to 10
-        h2 = lrelu( batchnormalize(tf.matmul(h1, self.discrim_W2) + self.discrim_b2))
+        h1 =F_V
+        if not self.simple_discriminator:
+            h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
+            # 512 to 10
+        h2 = lrelu(batchnormalize(tf.matmul(h1, self.discrim_W2) + self.discrim_b2))
         return h2
 
     def generator(self, F_I,F_V):
