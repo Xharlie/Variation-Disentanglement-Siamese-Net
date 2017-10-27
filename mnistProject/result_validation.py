@@ -13,8 +13,10 @@ def validate_F_V_classification_fail(conf):
 
     check_create_dir(conf["logs_dir_root"])
     check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"])
-    train_logs_dir = check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"]+'train/')
-    test_logs_dir = check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"]+'test/')
+    train_logs_dir = check_create_dir(conf["logs_dir_root"]
+                      + conf["F_V_validation_logs_dir_root"]+conf["time_dir"]+'/')
+    test_logs_dir = check_create_dir(conf["logs_dir_root"]
+                     + conf["F_V_validation_logs_dir_root"]+'test/')
 
     F_V_validation_model = F_V_validation(
         batch_size=conf["batch_size"],
@@ -165,15 +167,15 @@ def validate_F_V_classification_fail(conf):
         print("test discriminator accuracy:", accuracy_val)
         test_dis_cost_val_summary = tf.Summary(
             value=[tf.Summary.Value(tag="test_dis_cost", simple_value=dis_cost_val)])
-        test_writer.add_summary(test_dis_cost_val_summary,
+        training_writer.add_summary(test_dis_cost_val_summary,
                                     tf.train.global_step(sess, global_step))
         test_dis_total_cost_val_summary = tf.Summary(
             value=[tf.Summary.Value(tag="test_dis_total_cost", simple_value=dis_total_cost_val)])
-        test_writer.add_summary(test_dis_total_cost_val_summary,
+        training_writer.add_summary(test_dis_total_cost_val_summary,
                                     tf.train.global_step(sess, global_step))
         test_accuracy_val_summary = tf.Summary(
             value=[tf.Summary.Value(tag="test_accuracy", simple_value=accuracy_val)])
-        test_writer.add_summary(test_accuracy_val_summary,
+        training_writer.add_summary(test_accuracy_val_summary,
                                     tf.train.global_step(sess, global_step))
 
 if __name__ == "__main__":
@@ -209,6 +211,9 @@ if __name__ == "__main__":
     parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                         help="which gpu to use")
 
+    parser.add_argument("--time_dir", nargs='?', type=str, default='',
+                        help="time dir for tensorboard")
+
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
@@ -226,7 +231,7 @@ if __name__ == "__main__":
         "batch_size": args.batch_size,
         "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
         "image_shape": [28, 28, 1],
-        "dim_y:": 10,
+        "dim_y": 10,
         "dim_W1": 1024,
         "dim_W2": 128,
         "dim_W3": 64,
@@ -236,5 +241,6 @@ if __name__ == "__main__":
         "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
         "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
         "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
+        "time":args.time_dir
     }
     validate_F_V_classification_fail(F_V_classification_conf)

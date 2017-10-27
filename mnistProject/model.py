@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 from neural_helper import *
 
-class VDSN():
+class VDSN(object):
     def __init__(
             self,
             batch_size=100,
