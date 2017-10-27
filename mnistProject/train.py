@@ -234,7 +234,7 @@ F_V_classification_conf = {
     "teY": teY,
     "batch_size":batch_size,
     "image_shape":image_shape,
-    "dim_y:": dim_y,
+    "dim_y": dim_y,
     "dim_W1": dim_W1,
     "dim_W2": dim_W2,
     "dim_W3": dim_W3,
