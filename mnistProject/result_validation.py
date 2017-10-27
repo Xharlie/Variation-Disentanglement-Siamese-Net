@@ -204,8 +204,12 @@ if __name__ == "__main__":
 
     parser.add_argument("--F_V_validation_test_batch_size", nargs='?', type=int, default=1000,
                         help="F V validation's test_batch_size")
+    
+    parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
+                        help="which gpu to use")
 
     args = parser.parse_args()
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
     # amount of class label
     trX, vaX, teX, trY, vaY, teY = mnist_with_valid_set()
