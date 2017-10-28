@@ -215,5 +215,5 @@ class VDSN(object):
         if not self.simple_discriminator:
             h1 = lrelu(batchnormalize(tf.matmul(F_I, self.classifier_W1) + self.classifier_b1))
             # 512 to 10
-        h2 = lrelu(batchnormalize(tf.matmul(h1, self.classifier_W2) + self.classifier_b1))
+        h2 = lrelu(batchnormalize(tf.matmul(h1, self.classifier_W2) + self.classifier_b2))
         return h2
