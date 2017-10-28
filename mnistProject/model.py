@@ -18,7 +18,7 @@ class VDSN(object):
             simple_discriminator=True,
             simple_generator=True,
             simple_classifier=True,
-            one_minus_D = False
+            disentangle_obj_func = 'hybrid'
             ):
 
         self.batch_size = batch_size
@@ -32,7 +32,8 @@ class VDSN(object):
         self.simple_discriminator = simple_discriminator
         self.simple_generator = simple_generator
         self.simple_classifier = simple_classifier
-        self.one_minus_D=one_minus_D
+        # disentangle_obj_func = negative_log (-logD(x)), one_minus(log(1-D(x))) or hybrid
+        self.disentangle_obj_func=disentangle_obj_func
 
         if not self.simple_generator:
             self.gen_W1 = tf.Variable(tf.random_normal([dim_W1, dim_W1], stddev=0.02), name='gen_W1')
@@ -153,9 +154,15 @@ class VDSN(object):
                dis_prediction_left, dis_prediction_right, gen_cla_accuracy
 
     def gen_disentangle_cost(self, label, logits):
-        if self.one_minus_D:
-            return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=label, logits=1-logits))
-        return  -1 * tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=label, logits=logits))
+        minus_one_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+            labels=label, logits=1 - logits))
+        negative_log_loss = -1 * tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+            labels=label, logits=logits))
+        if self.disentangle_obj_func == 'one_minus':
+            return minus_one_loss
+        elif self.disentangle_obj_func == 'negative_log':
+            return negative_log_loss
+        return (minus_one_loss + negative_log_loss) / 2
 
 
     def encoder(self, image):

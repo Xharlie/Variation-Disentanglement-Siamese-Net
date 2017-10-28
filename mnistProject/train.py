@@ -92,8 +92,8 @@ parser.add_argument("--simple_generator", action="store_false",
 parser.add_argument("--simple_classifier", action="store_false",
                     help="simple_classifier indicate use one fc layer for classifier")
 
-parser.add_argument("--one_minus_D", action="store_true",
-                    help="generator's disentanglement loss use one_minus_D loss")
+parser.add_argument("--disentangle_obj_func", nargs='?', type=str, default='negative_log',
+                    help="generator's disentanglement loss use which loss, negative_log, one_minus or hybrid")
 
 # >==================  F_V_validation args =======================<
 
@@ -156,7 +156,7 @@ VDSN_model = VDSN(
         simple_discriminator=args.simple_discriminator,
         simple_generator=args.simple_generator,
         simple_classifier=args.simple_classifier,
-        one_minus_D=args.one_minus_D
+        disentangle_obj_func=args.c
 )
 
 Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\

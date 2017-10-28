@@ -183,7 +183,7 @@ def validate_F_V_classification_fail(conf):
 
 
     with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-        json.dump(vars(conf), file)
+        json.dump(conf, file)
         print("dumped conf info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
 
 
@@ -192,6 +192,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--batch_size", nargs='?', type=int, default=128,
                         help="batch_size")
+
+    parser.add_argument("--dim_y", nargs='?', type=int, default=10,
+                        help="dimension of digit")
 
     parser.add_argument("--dim_W1", nargs='?', type=int, default=128,
                         help="dimension of last encoder layer")
