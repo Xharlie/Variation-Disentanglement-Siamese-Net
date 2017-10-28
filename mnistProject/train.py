@@ -222,8 +222,8 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
                             dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
                         = sess.run(
-                            [train_op_gen, merged_summary, g_recon_cost_tf, gen_cla_cost_tf,
-                             gen_disentangle_cost_tf, gen_total_cost_tf,
+                            [train_op_gen, merged_summary, g_recon_cost_tf,
+                             gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
                              dis_prediction_tf_left, dis_prediction_tf_right,gen_cla_accuracy_tf],
                             feed_dict={
                                 Y_tf:Ys,
