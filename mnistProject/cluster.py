@@ -6,8 +6,9 @@ from sklearn import (manifold, datasets, decomposition, ensemble,
 
 
 # TSNE cluster
-def cluster(dim, valiX, target, feature_I, feature_V):
+def cluster(valiX, target, feature_I, feature_V):
     tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
+    print feature_I.shape
     feature_tsne_V = tsne.fit_transform(feature_V, valiX)
     plot_embedding(feature_tsne_V, valiX, target, title="Feature Visualization")
     feature_tsne_I = tsne.fit_transform(feature_I, valiX)

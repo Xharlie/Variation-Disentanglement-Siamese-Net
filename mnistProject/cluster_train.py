@@ -277,6 +277,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                                 })
                     # since 16 * 8  = batch size * 2
                     save_visualization(image_real_left, generated_samples_left, (16,8), save_path=args.pic_dir_parent+'sample_%04d.jpg' % int(iterations))
+                    cluster(image_real_left, vaY[0: visualize_dim], F_I_matrix, F_V_matrix)
                 iterations += 1
 
         # Save the variables to disk.

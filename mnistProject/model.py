@@ -151,7 +151,7 @@ class VDSN(object):
         return Y, image_real_left, image_real_right, gen_recon_cost, gen_disentangle_cost, \
                gen_cla_cost, gen_total_cost, \
                dis_cost_tf, dis_total_cost_tf, image_gen_left, image_gen_right, \
-               dis_prediction_left, dis_prediction_right, gen_cla_accuracy
+               dis_prediction_left, dis_prediction_right, gen_cla_accuracy, F_I_left, F_V_left
 
     def gen_disentangle_cost(self, label, logits):
         minus_one_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
