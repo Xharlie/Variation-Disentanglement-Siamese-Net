@@ -10,11 +10,23 @@ import json
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--gen_learning_rate", nargs='?', type=float, default=0.0002,
+parser.add_argument("--gen_start_learning_rate", nargs='?', type=float, default=0.002,
                     help="learning rate")
 
-parser.add_argument("--dis_learning_rate", nargs='?', type=float, default=0.0002,
+parser.add_argument("--dis_start_learning_rate", nargs='?', type=float, default=0.002,
                     help="learning rate")
+
+parser.add_argument("--gen_decay_step", nargs='?', type=int, default=10000,
+                    help="generator decay step")
+
+parser.add_argument("--dis_decay_step", nargs='?', type=int, default=10000,
+                    help="generator decay step")
+
+parser.add_argument("--gen_decay_rate", nargs='?', type=float, default=0.96,
+                    help="generator decay rate")
+
+parser.add_argument("--dis_decay_rate", nargs='?', type=float, default=1.00,
+                    help="discriminator decay rate")
 
 parser.add_argument("--batch_size", nargs='?', type=int, default=128,
                     help="batch_size")
@@ -53,6 +65,9 @@ parser.add_argument("--dis_regularizer_weight", nargs='?', type=float, default=0
 parser.add_argument("--gen_disentangle_weight", nargs='?', type=float, default=10.0,
                     help="generator disentanglement weight")
 
+parser.add_argument("--gen_cla_weight", nargs='?', type=float, default=5.0,
+                    help="generator classifier weight")
+
 parser.add_argument("--logs_dir_root", nargs='?', type=str, default='tensorflow_log/',
                     help="root dir to save training summary")
 
@@ -70,6 +85,15 @@ parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
 
 parser.add_argument("--simple_discriminator", action="store_false",
                     help="simple_discriminator indicate use one fc layer for discriminator")
+
+parser.add_argument("--simple_generator", action="store_false",
+                    help="simple_generator indicate use one fc layer for generator")
+
+parser.add_argument("--simple_classifier", action="store_false",
+                    help="simple_classifier indicate use one fc layer for classifier")
+
+parser.add_argument("--one_minus_D", action="store_true",
+                    help="generator's disentanglement loss use one_minus_D loss")
 
 # >==================  F_V_validation args =======================<
 
@@ -92,8 +116,7 @@ args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
 n_epochs = args.n_epochs
-gen_learning_rate = args.gen_learning_rate
-dis_learning_rate = args.dis_learning_rate
+
 batch_size = args.batch_size
 image_shape = [28,28,1]
 # amount of class label
@@ -106,6 +129,7 @@ time_dir = strftime("%Y-%m-%d-%H-%M-%S", localtime())
 gen_disentangle_weight = args.gen_disentangle_weight
 gen_regularizer_weight = args.gen_regularizer_weight
 dis_regularizer_weight = args.dis_regularizer_weight
+gen_cla_weight = args.gen_cla_weight
 # if we don't have these directory, create them
 check_create_dir(args.logs_dir_root)
 check_create_dir(args.logs_dir_root + args.main_logs_dir_root)
@@ -130,16 +154,25 @@ VDSN_model = VDSN(
         dim_W3=dim_W3,
         dim_F_I=dim_F_I,
         simple_discriminator=args.simple_discriminator,
+        simple_generator=args.simple_generator,
+        simple_classifier=args.simple_classifier,
+        one_minus_D=args.one_minus_D
 )
 
-Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
-    image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right = VDSN_model.build_model(
-    gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight)
+Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
+    gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
+    image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf \
+    = VDSN_model.build_model(
+    gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
 
 # saver to save trained model to disk
 saver = tf.train.Saver(max_to_keep=10)
 # global_step to record steps in total
 global_step = tf.Variable(0, trainable=False)
+gen_learning_rate = tf.train.exponential_decay(args.gen_start_learning_rate, global_step,
+                                               args.gen_decay_step, args.gen_decay_rate, staircase=True)
+dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, global_step,
+                                               args.dis_decay_step, args.dis_decay_rate, staircase=True)
 
 discrim_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
 gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
@@ -186,11 +219,12 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                 Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1]) / 255.
 
                 if np.mod( iterations, args.gen_odds ) == 0:
-                    _, summary, gen_recon_cost_val, gen_disentangle_val, gen_total_cost_val, \
-                            dis_prediction_val_left, dis_prediction_val_right \
+                    _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
+                            dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
                         = sess.run(
-                            [train_op_gen, merged_summary, g_recon_cost_tf, gen_disentangle_cost_tf, gen_total_cost_tf,
-                             dis_prediction_tf_left, dis_prediction_tf_right],
+                            [train_op_gen, merged_summary, g_recon_cost_tf, gen_cla_cost_tf,
+                             gen_disentangle_cost_tf, gen_total_cost_tf,
+                             dis_prediction_tf_left, dis_prediction_tf_right,gen_cla_accuracy_tf],
                             feed_dict={
                                 Y_tf:Ys,
                                 image_tf_real_left: Xs_left,
@@ -201,9 +235,11 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                     print("iteration:", iterations)
                     print("gen reconstruction loss:", gen_recon_cost_val)
                     print("gen disentanglement loss :", gen_disentangle_val)
+                    print("gen id classifier loss :", gen_cla_cost_val)
                     print("total weigthted gen loss :", gen_total_cost_val)
                     print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
+                    print("gen id classifier accuracy:", gen_cla_accuracy_val)
 
                 else:
                     _, summary, dis_cost_val, dis_total_cost_val, \
@@ -254,11 +290,6 @@ with tf.Session(config=tf.ConfigProto()) as sess:
             gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
         print("Model saved in file: %s" % save_path)
 
-        with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-            file.write(json.dumps(args))
-        with open(model_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-            file.write(json.dumps(args))
-
 F_V_classification_conf = {
     "save_path": save_path,
     "trX": trX,
@@ -283,11 +314,17 @@ F_V_classification_conf = {
     "time_dir":time_dir
 }
 
-with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-    file.write(json.dumps(args))
+# import pdb; pdb.set_trace()
 
+with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
+    json.dump(vars(args), file)
+    print("dumped args info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
+    # file.write(json.dump(args))
 with open(model_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-    file.write(json.dumps(args))
+    json.dump(vars(args), file)
+    print("dumped args info to " + model_dir + 'step' + str(iterations) + '_parameter.txt')
+
+
 
 if args.validate_disentanglement:
     tf.reset_default_graph()

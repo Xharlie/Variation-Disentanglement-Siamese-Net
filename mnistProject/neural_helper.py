@@ -10,6 +10,11 @@ def max_pool_2x2(x):
     """max_pool_2x2 downsamples a feature map by 2X."""
     return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                           strides=[1, 2, 2, 1], padding='SAME')
+
+def avg_pool_2x2(x):
+    """max_pool_2x2 downsamples a feature map by 2X."""
+    return tf.nn.avg_pool(x, ksize=[1, 2, 2, 1],
+                          strides=[1, 2, 2, 1], padding='SAME')
 def batchnormalize(X, eps=1e-8, g=None, b=None):
     if X.get_shape().ndims == 4:
         mean = tf.reduce_mean(X, [0,1,2])
