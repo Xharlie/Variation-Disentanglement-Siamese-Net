@@ -269,7 +269,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                         indexTableVal[vaY[index]].append(index)
                     corrRightVal = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
                     image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
-                    generated_samples_left, F_I_matrix, F_V_matrix = sess.run(
+                    generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                             [image_gen_left, F_V_left_tf, F_I_left_tf],
                             feed_dict={
                                 image_tf_real_left: image_real_left,
