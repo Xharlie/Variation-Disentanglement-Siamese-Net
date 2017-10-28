@@ -87,14 +87,11 @@ class VDSN(object):
         Y_dis_logits_left = self.discriminator(F_V_left)
         Y_dis_logits_right = self.discriminator(F_V_right)
 
-        Y_cla_logits_left = self.discriminator(F_I_left)
-        Y_cla_logits_right = self.discriminator(F_I_right)
+        Y_cla_logits_left = self.classifier(F_I_left)
+        Y_cla_logits_right = self.classifier(F_I_right)
 
         Y_dis_result_left = tf.reduce_sum(Y * tf.nn.softmax(Y_dis_logits_left), axis=1)
         Y_dis_result_right = tf.reduce_sum(Y * tf.nn.softmax(Y_dis_logits_right), axis=1)
-
-        # Y_cla_result_left = tf.reduce_sum(Y * tf.nn.softmax(Y_cla_logits_left), axis=1)
-        # Y_cla_result_right = tf.reduce_sum(Y * tf.nn.softmax(Y_cla_logits_right), axis=1)
 
         dis_prediction_left = [tf.reduce_max(Y_dis_result_left), tf.reduce_mean(Y_dis_result_left), tf.reduce_min(Y_dis_result_left)];
         dis_prediction_right = [tf.reduce_max(Y_dis_result_right), tf.reduce_mean(Y_dis_result_right), tf.reduce_min(Y_dis_result_right)];
