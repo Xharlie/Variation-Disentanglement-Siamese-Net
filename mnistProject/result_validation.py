@@ -3,6 +3,7 @@ from F_V_validation_model import *
 from util import *
 import argparse
 from load import *
+import json
 
 '''
 This function would train a classifier on top of the representation F_V,
@@ -13,8 +14,9 @@ def validate_F_V_classification_fail(conf):
 
     check_create_dir(conf["logs_dir_root"])
     check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"])
-    train_logs_dir = check_create_dir(conf["logs_dir_root"]
+    training_logs_dir = check_create_dir(conf["logs_dir_root"]
                       + conf["F_V_validation_logs_dir_root"]+conf["time_dir"]+'/')
+
     # test_logs_dir = check_create_dir(conf["logs_dir_root"]
     #                  + conf["F_V_validation_logs_dir_root"]+'test/')
 
@@ -44,7 +46,7 @@ def validate_F_V_classification_fail(conf):
 
     with tf.Session(config=tf.ConfigProto()) as sess:
         sess.run(tf.global_variables_initializer())
-        training_writer = tf.summary.FileWriter(train_logs_dir, sess.graph)
+        training_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
         # test_writer = tf.summary.FileWriter(test_logs_dir, sess.graph)
         train_merged_summary = tf.summary.merge_all('train')
         validation_merged_summary = tf.summary.merge_all('validation')
@@ -177,12 +179,35 @@ def validate_F_V_classification_fail(conf):
             value=[tf.Summary.Value(tag="test_accuracy", simple_value=accuracy_val)])
         training_writer.add_summary(test_accuracy_val_summary,
                                     tf.train.global_step(sess, global_step))
+        # except KeyboardInterrupt
+
+
+    with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
+        json.dump(conf, file)
+        print("dumped conf info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--batch_size", nargs='?', type=int, default=128,
                         help="batch_size")
+
+    parser.add_argument("--dim_y", nargs='?', type=int, default=10,
+                        help="dimension of digit")
+
+    parser.add_argument("--dim_W1", nargs='?', type=int, default=128,
+                        help="dimension of last encoder layer")
+
+    parser.add_argument("--dim_W2", nargs='?', type=int, default=128,
+                        help="dimension of second encoder layer ")
+
+    parser.add_argument("--dim_W3", nargs='?', type=int, default=64,
+                        help="dimension of first encoder layer ")
+
+    parser.add_argument("--dim_F_I", nargs='?', type=int, default=64,
+                        help="dimension of Identity representation, " +
+                             "the dimension of Variation respresentation is dim_W1-dim_F_I")
 
     parser.add_argument("--save_path", nargs='?', type=str, default='',
                         help="root dir to save training summary")
@@ -231,16 +256,16 @@ if __name__ == "__main__":
         "batch_size": args.batch_size,
         "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
         "image_shape": [28, 28, 1],
-        "dim_y": 10,
-        "dim_W1": 1024,
-        "dim_W2": 128,
-        "dim_W3": 64,
-        "dim_F_I": 512,
+        "dim_y": args.dim_y,
+        "dim_W1": args.dim_W1,
+        "dim_W2": args.dim_W2,
+        "dim_W3": args.dim_W3,
+        "dim_F_I": args.dim_F_I,
         "dis_regularizer_weight": args.dis_regularizer_weight,
         "logs_dir_root": args.logs_dir_root,
         "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
         "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
         "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
-        "time_dir":args.time_dir
+        "time_dir": args.time_dir
     }
     validate_F_V_classification_fail(F_V_classification_conf)
