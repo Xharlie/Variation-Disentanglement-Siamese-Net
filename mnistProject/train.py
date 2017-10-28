@@ -156,7 +156,7 @@ VDSN_model = VDSN(
         simple_discriminator=args.simple_discriminator,
         simple_generator=args.simple_generator,
         simple_classifier=args.simple_classifier,
-        disentangle_obj_func=args.c
+        disentangle_obj_func=args.disentangle_obj_func
 )
 
 Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
