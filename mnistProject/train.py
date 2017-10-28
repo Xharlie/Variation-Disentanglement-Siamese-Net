@@ -2,6 +2,7 @@ import os
 import numpy as np
 from model import *
 from util import *
+from cluster import *
 from load import mnist_with_valid_set
 from time import localtime, strftime
 import argparse
@@ -111,7 +112,7 @@ VDSN_model = VDSN(
 )
 
 Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
-    image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right = VDSN_model.build_model(
+    image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right, F_I_left_tf, F_V_left_tf = VDSN_model.build_model(
     gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight)
 
 # saver to save trained model to disk
@@ -197,10 +198,9 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                 print("=========== updating D ==========")
                 print("iteration:", iterations)
                 print("discriminator loss:", dis_cost_val)
-                print("discriminator total weigthted loss:", dis_total_cost_val)
+                print("discriminator total weighted loss:", dis_total_cost_val)
                 print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
                 print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
-
 
             if np.mod(iterations, drawing_step) == 0:
                 indexTableVal = [[] for i in range(10)]
@@ -208,20 +208,25 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                     indexTableVal[vaY[index]].append(index)
                 corrRightVal = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
                 image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
-                generated_samples_left = sess.run(
+                generated_samples_left, F_I_matrix, F_V_matrix = sess.run(
                         image_gen_left,
+                        F_I_left_tf, F_V_left_tf,
                         feed_dict={
                             image_tf_real_left: image_real_left,
                             image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
                             })
                 # since 16 * 8  = batch size * 2
-                save_visualization(image_real_left, generated_samples_left, (16,8), save_path=args.pic_dir_parent+'sample_%04d.jpg' % int(iterations))
-
+                save_visualization(image_real_left, generated_samples_left, (16,8),
+                                   save_path=args.pic_dir_parent+'sample_%04d.jpg' % int(iterations))
+                cluster(visualize_dim, vaX, trY[start: end], F_I_matrix, F_V_matrix)
             iterations += 1
 
     # Save the variables to disk.
     save_path = saver.save(sess, "{}{}_{}_{}_{}.ckpt".format(model_dir,
-        gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
+                                                             gen_regularizer_weight, dis_regularizer_weight,
+                                                             gen_disentangle_weight, time_dir
+                                                             )
+                           )
     print("Model saved in file: %s" % save_path)
 
 F_V_classification_conf = {
