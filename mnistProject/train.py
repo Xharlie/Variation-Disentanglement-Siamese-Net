@@ -11,6 +11,8 @@ import json
 import math
 
 parser = argparse.ArgumentParser()
+
+
 parser.add_argument("--gen_start_learning_rate", nargs='?', type=float, default=0.002,
                     help="learning rate")
 
@@ -74,6 +76,12 @@ parser.add_argument("--logs_dir_root", nargs='?', type=str, default='tensorflow_
 
 parser.add_argument("--main_logs_dir_root", nargs='?', type=str, default='main/',
                     help="root dir inside logs_dir_root to save main summary")
+
+parser.add_argument("--pretrain_model", nargs='?', type=str, default='',
+                    help="pretrain model")
+
+parser.add_argument("--pretrain_model_wo_lr", nargs='?', type=str, default='',
+                    help="pretrain model without learning rate")
 
 parser.add_argument("--model_dir_parent", nargs='?', type=str, default='model_treasury/',
                     help="root dir to save model")
@@ -176,17 +184,19 @@ gen_learning_rate = tf.train.exponential_decay(args.gen_start_learning_rate, glo
 dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, global_step,
                                                args.dis_decay_step, args.dis_decay_rate, staircase=True)
 
-discrim_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
+dis_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
 gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
+cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
 
 # include en_* and encoder_* W and b,
 encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
 
 train_op_gen = tf.train.AdamOptimizer(
-    gen_learning_rate, beta1=0.5).minimize(gen_total_cost_tf, var_list=gen_vars + encoder_vars, global_step=global_step)
+    gen_learning_rate, beta1=0.5).minimize(
+    gen_total_cost_tf, var_list=gen_vars + encoder_vars + cla_vars, global_step=global_step)
 
 train_op_discrim = tf.train.AdamOptimizer(
-    dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
+    dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
 
 iterations = 0
 save_path=""
@@ -198,6 +208,15 @@ with tf.Session(config=tf.ConfigProto()) as sess:
         training_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
         # test_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
         merged_summary = tf.summary.merge_all()
+
+        if (len(args.pretrain_model)>0):
+            # Create a saver. include gen_vars and encoder_vars
+            pretrain_saver = tf.train.Saver()
+            saver.restore(sess, args.pretrain_model)
+        elif (len(args.pretrain_model_wo_lr)>0):
+            # Create a saver. include gen_vars and encoder_vars
+            pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
+            saver.restore(sess, args.pretrain_model_wo_lr)
 
         for epoch in range(n_epochs):
             index = np.arange(len(trY))
