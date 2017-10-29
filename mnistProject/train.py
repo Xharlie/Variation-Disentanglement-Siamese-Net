@@ -299,7 +299,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                                        (int(math.ceil(batch_size ** (.5))),
                                         int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
                                        save_path=args.pic_dir_parent + 'sample_%04d.jpg' % int(iterations))
-                    iterations += 1
+                iterations += 1
 
         # Save the variables to disk.
         save_path = saver.save(sess, "{}{}_{}_{}_{}.ckpt".format(model_dir,
