@@ -8,7 +8,7 @@ from time import localtime, strftime
 import argparse
 import result_validation
 import json
-
+import math
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--gen_start_learning_rate", nargs='?', type=float, default=0.002,
@@ -276,8 +276,11 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                                 image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
                                 })
                     # since 16 * 8  = batch size * 2
-                    save_visualization(image_real_left, generated_samples_left, (16,8), save_path=args.pic_dir_parent+'sample_%04d.jpg' % int(iterations))
-                iterations += 1
+                    save_visualization(image_real_left, generated_samples_left,
+                                       (int(math.ceil(batch_size ** (.5))),
+                                        int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
+                                       save_path=args.pic_dir_parent + 'sample_%04d.jpg' % int(iterations))
+                    iterations += 1
 
         # Save the variables to disk.
         save_path = saver.save(sess, "{}{}_{}_{}_{}.ckpt".format(model_dir,
