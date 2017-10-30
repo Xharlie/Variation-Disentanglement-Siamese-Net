@@ -22,7 +22,6 @@ def validate_F_classification(conf):
 
     F_validation_model = F_validation(
         batch_size=conf["batch_size"],
-        image_shape=conf["image_shape"],
         dim_y=conf["dim_y"],
         dim_W1=conf["dim_W1"],
         dim_W2=conf["dim_W2"],
@@ -182,9 +181,8 @@ def validate_F_classification(conf):
                                     tf.train.global_step(sess, global_step))
         # except KeyboardInterrupt
 
-
     with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-        json.dump(dict(conf), file)
+        json.dump(conf, file)
         print("dumped conf info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
 
 
@@ -259,7 +257,6 @@ if __name__ == "__main__":
         "teY": teY,
         "batch_size": args.batch_size,
         "F_validation_test_batch_size": args.F_validation_test_batch_size,
-        "image_shape": [28, 28, 1],
         "dim_y": args.dim_y,
         "dim_W1": args.dim_W1,
         "dim_W2": args.dim_W2,
