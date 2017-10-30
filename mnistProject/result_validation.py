@@ -1,5 +1,5 @@
 import numpy as np
-from F_V_validation_model import *
+from F_validation_model import *
 from util import *
 import argparse
 from load import *
@@ -10,7 +10,7 @@ This function would train a classifier on top of the representation F_V,
 make sure it cannot train out the Identity
 '''
 
-def validate_F_V_classification_fail(conf):
+def validate_F_classification(conf):
 
     check_create_dir(conf["logs_dir_root"])
     check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"])
@@ -20,7 +20,7 @@ def validate_F_V_classification_fail(conf):
     # test_logs_dir = check_create_dir(conf["logs_dir_root"]
     #                  + conf["F_V_validation_logs_dir_root"]+'test/')
 
-    F_V_validation_model = F_V_validation(
+    F_V_validation_model = F_validation(
         batch_size=conf["batch_size"],
         image_shape=conf["image_shape"],
         dim_y=conf["dim_y"],
@@ -31,7 +31,8 @@ def validate_F_V_classification_fail(conf):
     )
 
     Y_tf, image_real_tf, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob_tf,accuracy_tf \
-        = F_V_validation_model.build_model(conf["dis_regularizer_weight"])
+        = F_V_validation_model.build_model(feature_selection= conf["feature_selection"],
+                                           dis_regularizer_weight=conf["dis_regularizer_weight"])
 
     global_step = tf.Variable(0, trainable=False)
 
@@ -183,7 +184,7 @@ def validate_F_V_classification_fail(conf):
 
 
     with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-        json.dump(conf, file)
+        json.dump(vars(conf), file)
         print("dumped conf info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
 
 
@@ -211,6 +212,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--save_path", nargs='?', type=str, default='',
                         help="root dir to save training summary")
+
+    parser.add_argument("--feature_selection", nargs='?', type=str, default='F_V',
+                        help="to validate F_V or F_I")
 
     parser.add_argument("--logs_dir_root", nargs='?', type=str, default='tensorflow_log/',
                         help="root dir to save training summary")
@@ -266,6 +270,7 @@ if __name__ == "__main__":
         "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
         "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
         "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
-        "time_dir": args.time_dir
+        "time_dir": args.time_dir,
+        "feature_selection" : args.feature_selection
     }
-    validate_F_V_classification_fail(F_V_classification_conf)
+    validate_F_classification(F_V_classification_conf)

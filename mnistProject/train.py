@@ -9,6 +9,7 @@ import argparse
 import result_validation
 import json
 import math
+import copy
 
 parser = argparse.ArgumentParser()
 
@@ -111,6 +112,9 @@ parser.add_argument("--F_V_validation_logs_dir_root", nargs='?', type=str, defau
 
 parser.add_argument("--validate_disentanglement", action="store_true",
                     help="run F_V disentanglement classification task")
+
+parser.add_argument("--validate_classification", action="store_true",
+                    help="run F_I classification task")
 
 parser.add_argument("--F_V_validation_n_epochs", nargs='?', type=int, default=100,
                     help="number of epochs for F_V_validation")
@@ -313,7 +317,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
             gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
         print("Model saved in file: %s" % save_path)
 
-F_V_classification_conf = {
+F_classification_conf = {
     "save_path": save_path,
     "trX": trX,
     "trY": trY,
@@ -334,7 +338,7 @@ F_V_classification_conf = {
     "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
     "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
     "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
-    "time_dir":time_dir
+    "time_dir": time_dir,
 }
 
 # import pdb; pdb.set_trace()
@@ -351,4 +355,12 @@ with open(model_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
 
 if args.validate_disentanglement:
     tf.reset_default_graph()
-    result_validation.validate_F_V_classification_fail(F_V_classification_conf)
+    F_V_classification_conf = copy.deepcopy(F_classification_conf)
+    F_V_classification_conf["feature_selection"] = "F_V"
+    result_validation.validate_F_classification(F_V_classification_conf)
+
+if args.validate_classification:
+    tf.reset_default_graph()
+    F_I_classification_conf = copy.deepcopy(F_classification_conf)
+    F_I_classification_conf["feature_selection"] = "F_I"
+    result_validation.validate_F_classification(F_I_classification_conf)
