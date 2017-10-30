@@ -20,7 +20,7 @@ def validate_F_classification(conf):
     # test_logs_dir = check_create_dir(conf["logs_dir_root"]
     #                  + conf["F_V_validation_logs_dir_root"]+'test/')
 
-    F_V_validation_model = F_validation(
+    F_validation_model = F_validation(
         batch_size=conf["batch_size"],
         image_shape=conf["image_shape"],
         dim_y=conf["dim_y"],
@@ -31,7 +31,7 @@ def validate_F_classification(conf):
     )
 
     Y_tf, image_real_tf, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob_tf,accuracy_tf \
-        = F_V_validation_model.build_model(feature_selection= conf["feature_selection"],
+        = F_validation_model.build_model(feature_selection= conf["feature_selection"],
                                            dis_regularizer_weight=conf["dis_regularizer_weight"])
 
     global_step = tf.Variable(0, trainable=False)
@@ -274,3 +274,4 @@ if __name__ == "__main__":
         "feature_selection" : args.feature_selection
     }
     validate_F_classification(F_V_classification_conf)
+
