@@ -10,7 +10,7 @@ This function would train a classifier on top of the representation F,
 make sure it cannot train out the Identity
 '''
 
-def validate_F_classification(conf):
+def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY):
 
     check_create_dir(conf["logs_dir_root"])
     check_create_dir(conf["logs_dir_root"] + conf["F_validation_logs_dir_root"])
@@ -22,6 +22,7 @@ def validate_F_classification(conf):
 
     F_validation_model = F_validation(
         batch_size=conf["batch_size"],
+        image_shape=conf["image_shape"],
         dim_y=conf["dim_y"],
         dim_W1=conf["dim_W1"],
         dim_W2=conf["dim_W2"],
@@ -56,13 +57,6 @@ def validate_F_classification(conf):
             # Create a saver. include gen_vars and encoder_vars
             saver = tf.train.Saver(gen_vars + encoder_vars)
             saver.restore(sess, conf["save_path"])
-
-        trX = conf["trX"]
-        trY = conf["trY"]
-        vaX = conf["vaX"]
-        vaY = conf["vaY"]
-        teX = conf["teX"]
-        teY = conf["teY"]
 
         for epoch in range(conf["F_validation_n_epochs"]):
             index = np.arange(len(conf["trY"]))
@@ -182,7 +176,7 @@ def validate_F_classification(conf):
         # except KeyboardInterrupt
 
     with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-        json.dump(conf, file)
+        json.dump(dict(conf), file)
         print("dumped conf info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
 
 
@@ -249,14 +243,9 @@ if __name__ == "__main__":
 
     F_classification_conf = {
         "save_path": args.save_path,
-        "trX": trX,
-        "trY": trY,
-        "vaX": vaX,
-        "vaY": vaY,
-        "teX": teX,
-        "teY": teY,
         "batch_size": args.batch_size,
         "F_validation_test_batch_size": args.F_validation_test_batch_size,
+        "image_shape": [28, 28, 1],
         "dim_y": args.dim_y,
         "dim_W1": args.dim_W1,
         "dim_W2": args.dim_W2,
@@ -270,5 +259,5 @@ if __name__ == "__main__":
         "time_dir": args.time_dir,
         "feature_selection" : args.feature_selection
     }
-    validate_F_classification(F_classification_conf)
+    validate_F_classification(F_classification_conf,trX,trY,vaX,vaY,teX,teY)
 
