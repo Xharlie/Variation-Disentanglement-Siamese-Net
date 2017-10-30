@@ -59,7 +59,7 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY):
             saver.restore(sess, conf["save_path"])
 
         for epoch in range(conf["F_validation_n_epochs"]):
-            index = np.arange(len(conf["trY"]))
+            index = np.arange(len(trY))
             np.random.shuffle(index)
             trX = trX[index]
             trY = trY[index]
