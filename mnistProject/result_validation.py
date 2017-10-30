@@ -6,19 +6,19 @@ from load import *
 import json
 
 '''
-This function would train a classifier on top of the representation F_V,
+This function would train a classifier on top of the representation F,
 make sure it cannot train out the Identity
 '''
 
 def validate_F_classification(conf):
 
     check_create_dir(conf["logs_dir_root"])
-    check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"])
+    check_create_dir(conf["logs_dir_root"] + conf["F_validation_logs_dir_root"])
     training_logs_dir = check_create_dir(conf["logs_dir_root"]
-                      + conf["F_V_validation_logs_dir_root"]+conf["time_dir"]+'/')
+                      + conf["F_validation_logs_dir_root"]+conf["time_dir"]+'/')
 
     # test_logs_dir = check_create_dir(conf["logs_dir_root"]
-    #                  + conf["F_V_validation_logs_dir_root"]+'test/')
+    #                  + conf["F_validation_logs_dir_root"]+'test/')
 
     F_validation_model = F_validation(
         batch_size=conf["batch_size"],
@@ -41,7 +41,7 @@ def validate_F_classification(conf):
     # include en_* and encoder_* W and b,
     encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
 
-    train_op = tf.train.AdamOptimizer(conf["F_V_validation_learning_rate"], beta1=0.5) \
+    train_op = tf.train.AdamOptimizer(conf["F_validation_learning_rate"], beta1=0.5) \
         .minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
     iterations = 0
 
@@ -65,7 +65,7 @@ def validate_F_classification(conf):
         teX = conf["teX"]
         teY = conf["teY"]
 
-        for epoch in range(conf["F_V_validation_n_epochs"]):
+        for epoch in range(conf["F_validation_n_epochs"]):
             index = np.arange(len(conf["trY"]))
             np.random.shuffle(index)
             trX = trX[index]
@@ -100,9 +100,9 @@ def validate_F_classification(conf):
             dis_total_cost_val_list=[]
             accuracy_val_list=[]
             for start, end in zip(
-                    range(0, len(vaY), conf["F_V_validation_test_batch_size"]),
-                    range(conf["F_V_validation_test_batch_size"], len(vaY),  \
-                    conf["F_V_validation_test_batch_size"])
+                    range(0, len(vaY), conf["F_validation_test_batch_size"]),
+                    range(conf["F_validation_test_batch_size"], len(vaY),  \
+                    conf["F_validation_test_batch_size"])
             ):
                 Xs = vaX[start:end].reshape([-1, 28, 28, 1]) / 255.
                 Ys = OneHot(vaY[start:end], 10)
@@ -144,8 +144,8 @@ def validate_F_classification(conf):
         dis_total_cost_val_list = []
         accuracy_val_list = []
         for start, end in zip(
-                range(0, len(teY), conf["F_V_validation_test_batch_size"]),
-                range(conf["F_V_validation_test_batch_size"], len(teY), conf["F_V_validation_test_batch_size"])
+                range(0, len(teY), conf["F_validation_test_batch_size"]),
+                range(conf["F_validation_test_batch_size"], len(teY), conf["F_validation_test_batch_size"])
         ):
             Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
             Ys = OneHot(teY[start:end], 10)
@@ -184,7 +184,7 @@ def validate_F_classification(conf):
 
 
     with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
-        json.dump(vars(conf), file)
+        json.dump(dict(conf), file)
         print("dumped conf info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
 
 
@@ -222,20 +222,20 @@ if __name__ == "__main__":
     parser.add_argument("--dis_regularizer_weight", nargs='?', type=float, default=0.01,
                         help="discriminator regularization weight")
 
-    parser.add_argument("--F_V_validation_logs_dir_root", nargs='?', type=str, default='F_V_validation/',
-                        help="root dir inside logs_dir_root to save F_V_validation summary")
+    parser.add_argument("--F_validation_logs_dir_root", nargs='?', type=str, default='F_validation/',
+                        help="root dir inside logs_dir_root to save F_validation summary")
 
     parser.add_argument("--validate_disentanglement", action="store_true",
-                        help="run F_V disentanglement classification task")
+                        help="run F disentanglement classification task")
 
-    parser.add_argument("--F_V_validation_n_epochs", nargs='?', type=int, default=100,
-                        help="number of epochs for F_V_validation")
+    parser.add_argument("--F_validation_n_epochs", nargs='?', type=int, default=100,
+                        help="number of epochs for F_validation")
 
-    parser.add_argument("--F_V_validation_learning_rate", nargs='?', type=float, default=0.0002,
-                        help="learning rate for F_V_validation")
+    parser.add_argument("--F_validation_learning_rate", nargs='?', type=float, default=0.0002,
+                        help="learning rate for F_validation")
 
-    parser.add_argument("--F_V_validation_test_batch_size", nargs='?', type=int, default=1000,
-                        help="F V validation's test_batch_size")
+    parser.add_argument("--F_validation_test_batch_size", nargs='?', type=int, default=1000,
+                        help="F validation's test_batch_size")
 
     parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                         help="which gpu to use")
@@ -249,7 +249,7 @@ if __name__ == "__main__":
     # amount of class label
     trX, vaX, teX, trY, vaY, teY = mnist_with_valid_set()
 
-    F_V_classification_conf = {
+    F_classification_conf = {
         "save_path": args.save_path,
         "trX": trX,
         "trY": trY,
@@ -258,7 +258,7 @@ if __name__ == "__main__":
         "teX": teX,
         "teY": teY,
         "batch_size": args.batch_size,
-        "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
+        "F_validation_test_batch_size": args.F_validation_test_batch_size,
         "image_shape": [28, 28, 1],
         "dim_y": args.dim_y,
         "dim_W1": args.dim_W1,
@@ -267,11 +267,11 @@ if __name__ == "__main__":
         "dim_F_I": args.dim_F_I,
         "dis_regularizer_weight": args.dis_regularizer_weight,
         "logs_dir_root": args.logs_dir_root,
-        "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
-        "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
-        "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
+        "F_validation_logs_dir_root": args.F_validation_logs_dir_root,
+        "F_validation_n_epochs": args.F_validation_n_epochs,
+        "F_validation_learning_rate": args.F_validation_learning_rate,
         "time_dir": args.time_dir,
         "feature_selection" : args.feature_selection
     }
-    validate_F_classification(F_V_classification_conf)
+    validate_F_classification(F_classification_conf)
 
