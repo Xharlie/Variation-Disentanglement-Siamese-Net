@@ -6,7 +6,7 @@ from cluster import *
 from load import mnist_with_valid_set
 from time import localtime, strftime
 import argparse
-import result_validation
+import classification_validation
 import json
 import math
 import copy
@@ -356,10 +356,10 @@ if args.validate_disentanglement:
     tf.reset_default_graph()
     F_V_classification_conf = copy.deepcopy(F_classification_conf)
     F_V_classification_conf["feature_selection"] = "F_V"
-    result_validation.validate_F_classification(F_V_classification_conf)
+    classification_validation.validate_F_classification(F_V_classification_conf)
 
 if args.validate_classification:
     tf.reset_default_graph()
     F_I_classification_conf = copy.deepcopy(F_classification_conf)
     F_I_classification_conf["feature_selection"] = "F_I"
-    result_validation.validate_F_classification(F_I_classification_conf)
+    classification_validation.validate_F_classification(F_I_classification_conf)

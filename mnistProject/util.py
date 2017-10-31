@@ -45,6 +45,21 @@ def save_visualization(X_origin, X, nh_nw, save_path='./vis/sample.jpg'):
 
     scipy.misc.imsave(save_path, img)
 
+def save_visualization_triplet(X_I, X_V, X, nh_nw, save_path='./vis_triple/sample.jpg'):
+    h,w = X.shape[1], X.shape[2]
+    img = np.zeros((h * nh_nw[0], w * 3 * nh_nw[1], 3))
+
+    for n in range(X.shape[0]):
+        # if iterate to more than the required amount of images, end drawing
+        if n >= nh_nw[0] * nh_nw[1] * 2:
+            break;
+        j = n // nh_nw[1]
+        i = n % nh_nw[1]
+        img[j*h:j*h+h, (3*i)*w:(3*i+1)*w, :] = X_I[n]
+        img[j*h:j*h+h, (3*i+1)*w:(3*i+2)*w, :] = X_V[n]
+        img[j*h:j*h+h, (3*i+2)*w:(3*i+3)*w, :] = X[n]
+    scipy.misc.imsave(save_path, img)
+
 def check_create_dir(dir):
     try:
         os.stat(dir)
@@ -53,14 +68,21 @@ def check_create_dir(dir):
     return dir
 
 
-def randomPickRight(start, end, trX, trY, indexTable):
+def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10):
     randomList = []
     for i in range(start, end):
         while True:
-            randomPick = np.random.choice(indexTable[trY[i]], 1)[0]
-            if randomPick == i:
-                continue
+            if feature == "F_I_F_V":
+                randomPick = np.random.choice(indexTable[trY[i]], 1)[0]
+                if randomPick == i:
+                    continue
+                else:
+                    randomList.append(randomPick)
+                break
             else:
-                randomList.append(randomPick)
-            break
+                index = np.random.randint(low=0, high=dim)
+                if index == trY[i]:
+                    continue
+                randomList.append(np.random.choice(indexTable[index], 1)[0])
+                break
     return trX[randomList]

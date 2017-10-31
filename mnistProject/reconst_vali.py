@@ -8,16 +8,17 @@ import math
 import json
 
 '''
-This function would train a classifier on top of the representation F_V,
+This function would train reconstruction of F_I + zeros, F_I + cross F_V, etc,
 make sure it cannot train out the Identity
 '''
 
-def validate_reconst_identity(conf):
+def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
 
+    global image_generated_val
     check_create_dir(conf["logs_dir_root"])
-    check_create_dir(conf["logs_dir_root"] + conf["F_V_validation_logs_dir_root"])
+    check_create_dir(conf["logs_dir_root"] + conf["F_validation_logs_dir_root"])
     training_logs_dir = check_create_dir(conf["logs_dir_root"]
-                      + conf["F_V_validation_logs_dir_root"]+conf["time_dir"]+'/')
+                      + conf["F_validation_logs_dir_root"]+conf["time_dir"]+'/')
 
     # test_logs_dir = check_create_dir(conf["logs_dir_root"]
     #                  + conf["F_V_validation_logs_dir_root"]+'test/')
@@ -31,40 +32,85 @@ def validate_reconst_identity(conf):
         dim_W3=conf["dim_W3"],
         dim_F_I=conf["dim_F_I"]
     )
-
-    Y_tf, image_real_tf, image_gen_tf \
-        = reconst_vali_model.build_model()
+    check_create_dir(args.pic_dir_parent)
+    Y_tf, center_representation_tf, image_real_left_tf, \
+    image_real_right_tf, image_F_I_tf, image_F_V_tf, image_generated_tf \
+        = reconst_vali_model.build_model(conf["feature_selection"])
 
     global_step = tf.Variable(0, trainable=False)
 
-    discrim_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
+    # discrim_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
     gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
     # include en_* and encoder_* W and b,
     encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
     iterations = 0
     with tf.Session(config=tf.ConfigProto()) as sess:
         sess.run(tf.global_variables_initializer())
+        indexTable = [[] for i in range(10)]
         if (len(conf["save_path"])>0):
             # Create a saver. include gen_vars and encoder_vars
             saver = tf.train.Saver(gen_vars + encoder_vars)
             saver.restore(sess, conf["save_path"])
 
-        teX = conf["teX"]
+        class_center_representations \
+            = np.zeros((conf["dim_y"], conf["dim_W1"] - conf["dim_F_I"]))
+
+        if conf["feature_selection"]=="F_I_F_V" or conf["feature_selection"]=="F_I_F_D_F_V":
+            for index in range(len(teY)):
+                indexTable[teY[index]].append(index)
+        else:
+            class_count = np.zeros(conf["dim_y"])
+            if conf["feature_selection"]=="F_I_C":
+                Y_tf_class, image_real_tf_class, F_I_tf_class, F_V_tf_class \
+                    = reconst_vali_model.build_class_center()
+                for start, end in zip(
+                        range(0, len(teX), conf["batch_size"]),
+                        range(conf["batch_size"], len(teX), conf["batch_size"])
+                ):
+                    Y_tf_class_val, F_I_tf_class_val, F_V_tf_class_val = sess.run(
+                        [Y_tf_class, F_I_tf_class, F_V_tf_class],
+                        feed_dict={
+                            Y_tf_class: teY[start:end],
+                            image_real_tf_class: teX[start:end].reshape([-1, 28, 28, 1]) / 255.
+                    })
+                    for i in range(F_V_tf_class_val.shape[0]):
+                        class_count[int(Y_tf_class_val[i])] += 1
+                        class_center_representations[int(Y_tf_class_val[i])] += F_V_tf_class_val[i]
+                class_center_representations = class_center_representations / class_count[:,None]
 
         for start, end in zip(
                 range(0, len(teX), conf["batch_size"]),
                 range(conf["batch_size"], len(teX), conf["batch_size"])
         ):
-            image_real_left = teX[start:end].reshape([-1, 28, 28, 1]) / 255
-            generated_samples = sess.run(
-                    image_gen_tf,
+            Xs_left = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
+            if conf["feature_selection"]=="F_I_F_V" or conf["feature_selection"]=="F_I_F_D_F_V":
+                Xs_right = randomPickRight(start, end, teX, teY, indexTable,
+                    feature=conf["feature_selection"]).reshape([-1, 28, 28, 1]) / 255.
+
+                image_F_I_val, image_F_V_val, image_generated_val = sess.run(
+                    [image_F_I_tf, image_F_V_tf, image_generated_tf],
                     feed_dict={
-                        image_real_tf: image_real_left
+                        image_real_left_tf: Xs_left,
+                        image_real_right_tf: Xs_right
                         })
-            save_visualization(image_real_left, generated_samples,
-                               (int(math.ceil(conf['batch_size'] ** (.5))),
-                                int(math.ceil(conf['batch_size'] / math.ceil(conf['batch_size'] ** (.5))))),
-                               save_path=args.pic_dir_parent + 'sample_reconst_mean_%04d.jpg' % int(iterations))
+                save_visualization_triplet(image_F_I_val, image_F_V_val, image_generated_val,
+                   (int(math.ceil(conf['batch_size'] ** (.5))),
+                    int(math.ceil(conf['batch_size'] / math.ceil(conf['batch_size'] ** (.5))))),
+                        save_path=args.pic_dir_parent + args.feature_selection + '_%04d.jpg' % int(
+                                               iterations))
+            else:
+                center_representation = class_center_representations[teY[start:end]]
+                image_F_I_val, image_F_V_val, image_generated_val = sess.run(
+                    [image_F_I_tf, image_F_V_tf, image_generated_tf],
+                    feed_dict={
+                        image_real_left_tf: Xs_left,
+                        center_representation_tf: center_representation
+                    })
+                save_visualization_triplet(image_F_I_val, image_F_V_val, image_generated_val,
+                   (int(math.ceil(conf['batch_size'] ** (.5))),
+                    int(math.ceil(conf['batch_size'] / math.ceil(conf['batch_size'] ** (.5))))),
+                   save_path=args.pic_dir_parent + args.feature_selection + '_%04d.jpg' % int(
+                       iterations))
             iterations += 1
 
 
@@ -93,32 +139,33 @@ if __name__ == "__main__":
     parser.add_argument("--save_path", nargs='?', type=str, default='',
                         help="root dir to save training summary")
 
+    parser.add_argument("--feature_selection", nargs='?', type=str, default='F_I_0',
+                        help="to validate F_I_0 for F_I and 00," +
+                             " or F_I_F_V for F_I and F_V,  " +
+                             "F_I_C for F_I and F center " +
+                             "F_I_F_D_F_V for F_I with F_V from different digit"
+                        )
+
     parser.add_argument("--logs_dir_root", nargs='?', type=str, default='tensorflow_log/',
                         help="root dir to save training summary")
 
     parser.add_argument("--dis_regularizer_weight", nargs='?', type=float, default=0.01,
                         help="discriminator regularization weight")
 
-    parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='recon_vis/',
-                        help="root dir to save pic")
-
-    parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
-                        help="how many steps to draw a comparision pic")
-
-    parser.add_argument("--F_V_validation_logs_dir_root", nargs='?', type=str, default='F_V_validation/',
-                        help="root dir inside logs_dir_root to save F_V_validation summary")
+    parser.add_argument("--F_validation_logs_dir_root", nargs='?', type=str, default='F_validation/',
+                        help="root dir inside logs_dir_root to save F_validation summary")
 
     parser.add_argument("--validate_disentanglement", action="store_true",
-                        help="run F_V disentanglement classification task")
+                        help="run F disentanglement classification task")
 
-    parser.add_argument("--F_V_validation_n_epochs", nargs='?', type=int, default=100,
-                        help="number of epochs for F_V_validation")
+    parser.add_argument("--F_validation_n_epochs", nargs='?', type=int, default=100,
+                        help="number of epochs for F_validation")
 
-    parser.add_argument("--F_V_validation_learning_rate", nargs='?', type=float, default=0.0002,
-                        help="learning rate for F_V_validation")
+    parser.add_argument("--F_validation_learning_rate", nargs='?', type=float, default=0.0002,
+                        help="learning rate for F_validation")
 
-    parser.add_argument("--F_V_validation_test_batch_size", nargs='?', type=int, default=1000,
-                        help="F V validation's test_batch_size")
+    parser.add_argument("--F_validation_test_batch_size", nargs='?', type=int, default=1000,
+                        help="F validation's test_batch_size")
 
     parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                         help="which gpu to use")
@@ -126,22 +173,19 @@ if __name__ == "__main__":
     parser.add_argument("--time_dir", nargs='?', type=str, default='',
                         help="time dir for tensorboard")
 
+    parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='./recon_vis/',
+                        help="picture folder for reconstruction validation")
+
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
     # amount of class label
     trX, vaX, teX, trY, vaY, teY = mnist_with_valid_set()
 
-    F_I_classification_conf = {
+    conf = {
         "save_path": args.save_path,
-        "trX": trX,
-        "trY": trY,
-        "vaX": vaX,
-        "vaY": vaY,
-        "teX": teX,
-        "teY": teY,
         "batch_size": args.batch_size,
-        "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
+        "F_validation_test_batch_size": args.F_validation_test_batch_size,
         "image_shape": [28, 28, 1],
         "dim_y": args.dim_y,
         "dim_W1": args.dim_W1,
@@ -150,9 +194,11 @@ if __name__ == "__main__":
         "dim_F_I": args.dim_F_I,
         "dis_regularizer_weight": args.dis_regularizer_weight,
         "logs_dir_root": args.logs_dir_root,
-        "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
-        "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
-        "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
-        "time_dir": args.time_dir
+        "F_validation_logs_dir_root": args.F_validation_logs_dir_root,
+        "F_validation_n_epochs": args.F_validation_n_epochs,
+        "F_validation_learning_rate": args.F_validation_learning_rate,
+        "time_dir": args.time_dir,
+        "feature_selection" : args.feature_selection,
+        "pic_dir_parent": args.pic_dir_parent
     }
-    validate_reconst_identity(F_I_classification_conf)
+    validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY)
