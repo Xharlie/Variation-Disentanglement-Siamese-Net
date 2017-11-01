@@ -220,11 +220,11 @@ with tf.Session(config=tf.ConfigProto()) as sess:
         if (len(args.pretrain_model)>0):
             # Create a saver. include gen_vars and encoder_vars
             pretrain_saver = tf.train.Saver()
-            saver.restore(sess, args.pretrain_model)
+            pretrain_saver.restore(sess, args.pretrain_model)
         elif (len(args.pretrain_model_wo_lr)>0):
             # Create a saver. include gen_vars and encoder_vars
             pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
-            saver.restore(sess, args.pretrain_model_wo_lr)
+            pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
 
         for epoch in range(n_epochs):
             index = np.arange(len(trY))
