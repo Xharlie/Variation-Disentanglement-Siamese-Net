@@ -7,6 +7,7 @@ from load import mnist_with_valid_set
 from time import localtime, strftime
 import argparse
 import classification_validation
+import reconst_vali
 import json
 import math
 import copy
@@ -54,7 +55,10 @@ parser.add_argument("--dim_F_I", nargs='?', type=int, default=64,
 parser.add_argument("--n_epochs", nargs='?', type=int, default=100,
                     help="number of epochs")
 
-parser.add_argument("--gen_odds", nargs='?', type=int, default=100,
+parser.add_argument("--gen_series", nargs='?', type=int, default=10,
+                    help="how many time the generator can train once")
+
+parser.add_argument("--dis_series", nargs='?', type=int, default=100,
                     help="how many time the generator can train once")
 
 parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
@@ -319,12 +323,6 @@ with tf.Session(config=tf.ConfigProto()) as sess:
 
 F_classification_conf = {
     "save_path": save_path,
-    "trX": trX,
-    "trY": trY,
-    "vaX": vaX,
-    "vaY": vaY,
-    "teX": teX,
-    "teY": teY,
     "batch_size": batch_size,
     "dim_y": dim_y,
     "dim_W1": dim_W1,
@@ -356,10 +354,10 @@ if args.validate_disentanglement:
     tf.reset_default_graph()
     F_V_classification_conf = copy.deepcopy(F_classification_conf)
     F_V_classification_conf["feature_selection"] = "F_V"
-    classification_validation.validate_F_classification(F_V_classification_conf)
+    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY)
 
 if args.validate_classification:
     tf.reset_default_graph()
     F_I_classification_conf = copy.deepcopy(F_classification_conf)
     F_I_classification_conf["feature_selection"] = "F_I"
-    classification_validation.validate_F_classification(F_I_classification_conf)
+    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY)
