@@ -56,10 +56,10 @@ parser.add_argument("--n_epochs", nargs='?', type=int, default=100,
                     help="number of epochs")
 
 parser.add_argument("--gen_series", nargs='?', type=int, default=10,
-                    help="how many time the generator can train once")
+                    help="how many time the generator can train consecutively")
 
 parser.add_argument("--dis_series", nargs='?', type=int, default=100,
-                    help="how many time the generator can train once")
+                    help="how many time the dis can train consecutively")
 
 parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
                     help="how many steps to draw a comparision pic")
@@ -247,7 +247,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
 
                 Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1]) / 255.
 
-                if np.mod( iterations, args.gen_odds ) == 0:
+                if np.mod( iterations, args.gen_series + args.dis_series ) >= args.dis_series:
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
                             dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
                         = sess.run(
