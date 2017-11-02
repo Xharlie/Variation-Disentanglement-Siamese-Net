@@ -188,7 +188,7 @@ class VDSN(object):
 
         with tf.name_scope('encoder_fc1'):
             h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
-            h_fc1 = tf.matmul(h_pool2_flat, self.encoder_W3) + self.encoder_b3
+            h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.encoder_W3) + self.encoder_b3))
 
         return h_fc1
 
@@ -207,7 +207,7 @@ class VDSN(object):
         h1 = F_combine
         if not self.simple_generator:
             h1 = lrelu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
-        h2 = tf.nn.relu(batchnormalize(tf.matmul(h1, self.gen_W2)))
+        h2 = lrelu(batchnormalize(tf.matmul(h1, self.gen_W2)))
         h2 = tf.reshape(h2, [-1,7,7,self.dim_W2])
 
         output_shape_l3 = [tf.shape(h2)[0],14,14,self.dim_W3]
