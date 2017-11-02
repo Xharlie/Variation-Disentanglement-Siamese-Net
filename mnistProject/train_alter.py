@@ -329,6 +329,7 @@ F_classification_conf = {
     "dim_W2": dim_W2,
     "dim_W3": dim_W3,
     "dim_F_I": dim_F_I,
+    "image_shape": [28,28,1],
     "dis_regularizer_weight": args.dis_regularizer_weight,
     "logs_dir_root": args.logs_dir_root,
     "F_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
