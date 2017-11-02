@@ -331,10 +331,10 @@ F_classification_conf = {
     "dim_F_I": dim_F_I,
     "dis_regularizer_weight": args.dis_regularizer_weight,
     "logs_dir_root": args.logs_dir_root,
-    "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
-    "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
-    "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
-    "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
+    "F_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
+    "F_validation_n_epochs": args.F_V_validation_n_epochs,
+    "F_validation_learning_rate": args.F_V_validation_learning_rate,
+    "F_validation_test_batch_size": args.F_V_validation_test_batch_size,
     "time_dir": time_dir,
 }
 
