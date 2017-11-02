@@ -306,18 +306,66 @@ class VDSN_FACE(object):
         with tf.name_scope('gen_combine'):
             F_combine = tf.concat(axis=1, values=[F_I, F_V])
         with tf.name_scope('gen_FC'):
-            h_FC = lrelu(batchnormalize(tf.matmul(F_combine, self.generator_WFC) + self.encoder_bFC))
+            h_FC = lrelu(batchnormalize(tf.matmul(F_combine, self.generator_WFC) + self.generator_bFC))
+            h_FC = tf.reshape(h_FC, [-1, 6, 6, self.generator_WFC[3]])
         with tf.name_scope('gen_52'):
-            output_shape = [tf.shape(h_FC)[0], 14, 14, self.dim_W3]
-            h2 = tf.nn.relu(batchnormalize(tf.matmul(h1, self.gen_W2)))
-            h2 = tf.reshape(h2, [-1, 7, 7, self.dim_W2])
+            output_shape = [tf.shape(h_FC)[0], 6, 6, self.generator_W52.shape[3]]
+            h_52 = tf.nn.conv2d_transpose(h_FC, self.generator_W52, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_52 = lrelu(batchnormalize(h_52 + self.generator_b52))
+        with tf.name_scope('gen_51'):
+            output_shape = [tf.shape(h_52)[0], 6, 6, self.generator_W51.shape[3]]
+            h_51 = tf.nn.conv2d_transpose(h_52, self.generator_W51, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_51 = lrelu(batchnormalize(h_51 + self.generator_b51))
+        with tf.name_scope('gen_43'):
+            output_shape = [tf.shape(h_51)[0], 12, 12, self.generator_W43.shape[3]]
+            h_43 = tf.nn.conv2d_transpose(h_51, self.generator_W43, output_shape=output_shape, strides=[1, 2, 2, 1])
+            h_43 = lrelu(batchnormalize(h_43 + self.generator_b43))
+        with tf.name_scope('gen_42'):
+            output_shape = [tf.shape(h_43)[0], 12, 12, self.generator_W42.shape[3]]
+            h_42 = tf.nn.conv2d_transpose(h_43, self.generator_W42, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_42 = lrelu(batchnormalize(h_42 + self.generator_b42))
+        with tf.name_scope('gen_41'):
+            output_shape = [tf.shape(h_42)[0], 12, 12, self.generator_W41.shape[3]]
+            h_41 = tf.nn.conv2d_transpose(h_42, self.generator_W41, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_41 = lrelu(batchnormalize(h_41 + self.generator_b41))
+        with tf.name_scope('gen_33'):
+            output_shape = [tf.shape(h_41)[0], 24, 24, self.generator_W33.shape[3]]
+            h_33 = tf.nn.conv2d_transpose(h_41, self.generator_W33, output_shape=output_shape, strides=[1, 2, 2, 1])
+            h_33 = lrelu(batchnormalize(h_33 + self.generator_b33))
+        with tf.name_scope('gen_32'):
+            output_shape = [tf.shape(h_33)[0], 24, 24, self.generator_W32.shape[3]]
+            h_32 = tf.nn.conv2d_transpose(h_33, self.generator_W32, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_32 = lrelu(batchnormalize(h_32 + self.generator_b32))
+        with tf.name_scope('gen_31'):
+            output_shape = [tf.shape(h_32)[0], 24, 24, self.generator_W31.shape[3]]
+            h_31 = tf.nn.conv2d_transpose(h_32, self.generator_W31, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_31 = lrelu(batchnormalize(h_31 + self.generator_b31))
+        with tf.name_scope('gen_23'):
+            output_shape = [tf.shape(h_31)[0], 48, 48, self.generator_W23.shape[3]]
+            h_23 = tf.nn.conv2d_transpose(h_31, self.generator_W23, output_shape=output_shape, strides=[1, 2, 2, 1])
+            h_23 = lrelu(batchnormalize(h_23 + self.generator_b23))
+        with tf.name_scope('gen_22'):
+            output_shape = [tf.shape(h_23)[0], 48, 48, self.generator_W22.shape[3]]
+            h_22 = tf.nn.conv2d_transpose(h_23, self.generator_W22, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_22 = lrelu(batchnormalize(h_22 + self.generator_b22))
+        with tf.name_scope('gen_21'):
+            output_shape = [tf.shape(h_22)[0], 48, 48, self.generator_W21.shape[3]]
+            h_21 = tf.nn.conv2d_transpose(h_22, self.generator_W21, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_21 = lrelu(batchnormalize(h_21 + self.generator_b21))
+        with tf.name_scope('gen_13'):
+            output_shape = [tf.shape(h_21)[0], 96, 96, self.generator_W13.shape[3]]
+            h_13 = tf.nn.conv2d_transpose(h_21, self.generator_W13, output_shape=output_shape, strides=[1, 2, 2, 1])
+            h_13 = lrelu(batchnormalize(h_13 + self.generator_b13))
+        with tf.name_scope('gen_12'):
+            output_shape = [tf.shape(h_13)[0], 96, 96, self.generator_W12.shape[3]]
+            h_12 = tf.nn.conv2d_transpose(h_13, self.generator_W12, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_12 = lrelu(batchnormalize(h_12 + self.generator_b12))
+        with tf.name_scope('gen_11'):
+            output_shape = [tf.shape(h_12)[0], 96, 96, self.generator_W11.shape[3]]
+            h_11 = tf.nn.conv2d_transpose(h_12, self.generator_W11, output_shape=output_shape, strides=[1, 1, 1, 1])
+            h_11 = lrelu(batchnormalize(h_11 + self.generator_b11))
+        return h_11
 
-        output_shape_l3 = [tf.shape(h2)[0], 14, 14, self.dim_W3]
-        h3 = tf.nn.conv2d_transpose(h2, self.gen_W3, output_shape=output_shape_l3, strides=[1, 2, 2, 1])
-        h3 = tf.nn.relu(batchnormalize(h3))
-        output_shape_l4 = [tf.shape(h3)[0], 28, 28, self.image_shape[-1]]
-        h4 = tf.nn.conv2d_transpose(h3, self.gen_W4, output_shape=output_shape_l4, strides=[1, 2, 2, 1])
-        return h4
 
     def classifier(self, F_I):
         h1 = F_I
