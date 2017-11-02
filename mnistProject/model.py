@@ -188,7 +188,7 @@ class VDSN(object):
 
         with tf.name_scope('encoder_fc1'):
             h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
-            h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, self.encoder_W3) + self.encoder_b3)
+            h_fc1 = tf.matmul(h_pool2_flat, self.encoder_W3) + self.encoder_b3
 
         return h_fc1
 
@@ -198,7 +198,7 @@ class VDSN(object):
         if not self.simple_discriminator:
             h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
             # 512 to 10
-        h2 = lrelu(batchnormalize(tf.matmul(h1, self.discrim_W2) + self.discrim_b2))
+        h2 = tf.matmul(h1, self.discrim_W2) + self.discrim_b2
         return h2
 
     def generator(self, F_I,F_V):
@@ -206,13 +206,13 @@ class VDSN(object):
         F_combine = tf.concat(axis=1, values=[F_I,F_V])
         h1 = F_combine
         if not self.simple_generator:
-            h1 = tf.nn.relu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
+            h1 = lrelu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
         h2 = tf.nn.relu(batchnormalize(tf.matmul(h1, self.gen_W2)))
         h2 = tf.reshape(h2, [-1,7,7,self.dim_W2])
 
         output_shape_l3 = [tf.shape(h2)[0],14,14,self.dim_W3]
         h3 = tf.nn.conv2d_transpose(h2, self.gen_W3, output_shape=output_shape_l3, strides=[1,2,2,1])
-        h3 = tf.nn.relu(batchnormalize(h3))
+        h3 = lrelu(batchnormalize(h3))
         output_shape_l4 = [tf.shape(h3)[0],28,28,self.image_shape[-1]]
         h4 = tf.nn.conv2d_transpose(h3, self.gen_W4, output_shape=output_shape_l4, strides=[1,2,2,1])
         return h4
@@ -222,5 +222,5 @@ class VDSN(object):
         if not self.simple_discriminator:
             h1 = lrelu(batchnormalize(tf.matmul(F_I, self.classifier_W1) + self.classifier_b1))
             # 512 to 10
-        h2 = lrelu(batchnormalize(tf.matmul(h1, self.classifier_W2) + self.classifier_b2))
+        h2 = tf.matmul(h1, self.classifier_W2) + self.classifier_b2
         return h2
