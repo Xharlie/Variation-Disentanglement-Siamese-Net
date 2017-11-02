@@ -47,19 +47,6 @@ class VDSN_FACE(object):
         # disentangle_obj_func = negative_log (-logD(x)), one_minus(log(1-D(x))) or hybrid
         self.disentangle_obj_func = disentangle_obj_func
 
-        if not self.simple_generator:
-            self.gen_W1 = tf.Variable(tf.random_normal([dim_W1, dim_W1], stddev=0.02), name='gen_W1')
-        self.gen_W2 = tf.Variable(tf.random_normal([dim_W1, dim_W2 * 7 * 7], stddev=0.02), name='gen_W2')
-        self.gen_W3 = tf.Variable(tf.random_normal([5, 5, dim_W3, dim_W2], stddev=0.02), name='gen_W3')
-        self.gen_W4 = tf.Variable(tf.random_normal([5, 5, image_shape[-1], dim_W3], stddev=0.02), name='gen_W4')
-
-        if not self.simple_discriminator:
-            self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02),
-                                          name='discrim_W1')
-            self.discrim_b1 = bias_variable([self.dim_F_V], name='dis_b1')
-        self.discrim_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_y], stddev=0.02), name='discrim_W2')
-        self.discrim_b2 = bias_variable([self.dim_y], name='dis_b2')
-
         #  weight of encoder:
         self.encoder_W11 = tf.Variable(tf.random_normal([3, 3, image_shape[-1], dim_11_fltr], stddev=0.02), name='encoder_W11')
         self.encoder_W12 = tf.Variable(tf.random_normal([3, 3, dim_11_fltr, dim_12_fltr], stddev=0.02), name='encoder_W12')
@@ -126,12 +113,14 @@ class VDSN_FACE(object):
         self.generator_b52 = bias_variable([dim_52_fltr], name='gen_b52')
         self.generator_bFC = bias_variable([dim_53_fltr], name='gen_bFC')
 
-        if not self.simple_classifier:
-            self.classifier_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_F_I], stddev=0.02),
-                                             name='classif_W1')
-            self.classifier_b1 = bias_variable([self.dim_F_V], name='cla_b1')
-        self.classifier_W2 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02), name='classif_W2')
-        self.classifier_b2 = bias_variable([self.dim_y], name='cla_b2')
+
+        # Weight of classifier:
+        self.classifier_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02),name='classif_W1')
+        self.classifier_b1 = bias_variable([self.dim_y], name='cla_b1')
+
+        # Weight of discriminator:
+        self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02),name='discrim_W1')
+        self.discrim_b1 = bias_variable([self.dim_y], name='dis_b1')
 
     def build_model(self, gen_disentangle_weight=1, gen_regularizer_weight=1,
                     dis_regularizer_weight=1, gen_cla_weight=1):
@@ -294,12 +283,8 @@ class VDSN_FACE(object):
 
     def discriminator(self, F_V):
         # 512 to 512
-        h1 = F_V
-        if not self.simple_discriminator:
-            h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
-            # 512 to 10
-        h2 = lrelu(batchnormalize(tf.matmul(h1, self.discrim_W2) + self.discrim_b2))
-        return h2
+        h1 = tf.matmul(F_V, self.discrim_W1) + self.discrim_b1
+        return h1
 
     def generator(self, F_I, F_V):
 
@@ -363,14 +348,11 @@ class VDSN_FACE(object):
         with tf.name_scope('gen_11'):
             output_shape = [tf.shape(h_12)[0], 96, 96, self.generator_W11.shape[3]]
             h_11 = tf.nn.conv2d_transpose(h_12, self.generator_W11, output_shape=output_shape, strides=[1, 1, 1, 1])
-            h_11 = lrelu(batchnormalize(h_11 + self.generator_b11))
+            h_11 = h_11 + self.generator_b11
         return h_11
 
 
     def classifier(self, F_I):
-        h1 = F_I
-        if not self.simple_discriminator:
-            h1 = lrelu(batchnormalize(tf.matmul(F_I, self.classifier_W1) + self.classifier_b1))
-            # 512 to 10
-        h2 = lrelu(batchnormalize(tf.matmul(h1, self.classifier_W2) + self.classifier_b2))
-        return h2
+        h1 = lrelu(batchnormalize(tf.matmul(F_I, self.classifier_W1) + self.classifier_b1))
+        # 512 to dim_y
+        return h1
