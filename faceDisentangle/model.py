@@ -353,6 +353,6 @@ class VDSN_FACE(object):
 
 
     def classifier(self, F_I):
-        h1 = lrelu(batchnormalize(tf.matmul(F_I, self.classifier_W1) + self.classifier_b1))
+        h1 = tf.matmul(F_I, self.classifier_W1) + self.classifier_b1
         # 512 to dim_y
         return h1

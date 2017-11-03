@@ -3,16 +3,17 @@ import matplotlib.pyplot as plt
 from matplotlib import offsetbox
 from sklearn import (manifold, datasets, decomposition, ensemble,
                      discriminant_analysis, random_projection)
+import util
 np.random.seed(1)
 
 
 # TSNE cluster
-def cluster(originData, target, feature_I, feature_V):
+def cluster(originData, target, feature_I, feature_V, iterations=0):
     tsne = manifold.TSNE(n_components=2, init='pca', random_state=1)
     feature_tsne_V = tsne.fit_transform(feature_V)
-    plot_embedding(feature_tsne_V, originData, target, title="Variables")
+    plot_embedding(feature_tsne_V, originData, target, title="Variables_"+str(iterations))
     feature_tsne_I = tsne.fit_transform(feature_I)
-    plot_embedding(feature_tsne_I, originData, target, title="Identity")
+    plot_embedding(feature_tsne_I, originData, target, title="Identity_"+str(iterations))
 
 
 # Scale and visualize the embedding vectors
@@ -46,4 +47,5 @@ def plot_embedding(X, originData, target, title=None):
     plt.xticks([]), plt.yticks([])
     if title is not None:
         plt.title(title)
+    util.check_create_dir("./visualFig/")
     plt.savefig("./visualFig/visual{}.png".format(title))
