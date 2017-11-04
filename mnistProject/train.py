@@ -183,10 +183,10 @@ Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_
     = VDSN_model.build_model(
     gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
 
+global_step = tf.Variable(0, trainable=False)
 # saver to save trained model to disk
 saver = tf.train.Saver(max_to_keep=10)
 # global_step to record steps in total
-global_step = tf.Variable(0, trainable=False)
 gen_learning_rate = tf.train.exponential_decay(args.gen_start_learning_rate, global_step,
                                                args.gen_decay_step, args.gen_decay_rate, staircase=True)
 dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, global_step,
