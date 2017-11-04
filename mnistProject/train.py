@@ -219,8 +219,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
 
         if (len(args.pretrain_model)>0):
             # Create a saver. include gen_vars and encoder_vars
-            pretrain_saver = tf.train.Saver()
-            pretrain_saver.restore(sess, args.pretrain_model)
+            saver.restore(sess, args.pretrain_model)
         elif (len(args.pretrain_model_wo_lr)>0):
             # Create a saver. include gen_vars and encoder_vars
             pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
@@ -361,4 +360,4 @@ if args.validate_classification:
     tf.reset_default_graph()
     F_I_classification_conf = copy.deepcopy(F_classification_conf)
     F_I_classification_conf["feature_selection"] = "F_I"
-    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY)
+    classification_validation.validate_F_classification(F_I_classification_conf,trX,trY,vaX,vaY,teX,teY)
