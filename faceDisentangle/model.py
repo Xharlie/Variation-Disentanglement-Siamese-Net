@@ -10,7 +10,7 @@ from neural_helper import *
 class VDSN_FACE(object):
     def __init__(
             self,
-            batch_size=100,
+            batch_size=64,
             image_shape=[96, 96, 3],
             dim_y=10,
             dim_11_fltr=32,
@@ -44,6 +44,7 @@ class VDSN_FACE(object):
         self.simple_discriminator = simple_discriminator
         self.simple_generator = simple_generator
         self.simple_classifier = simple_classifier
+        self.dim_53_fltr = dim_53_fltr
         # disentangle_obj_func = negative_log (-logD(x)), one_minus(log(1-D(x))) or hybrid
         self.disentangle_obj_func = disentangle_obj_func
 
@@ -81,23 +82,21 @@ class VDSN_FACE(object):
 
 
         # Weight of generator:
-        self.generator_W11 = tf.Variable(tf.random_normal([3, 3, dim_11_fltr, image_shape[-1]], stddev=0.02), name='generator_W11')
-        self.generator_W12 = tf.Variable(tf.random_normal([3, 3, dim_12_fltr, dim_11_fltr], stddev=0.02), name='generator_W12')
-        self.generator_W13 = tf.Variable(tf.random_normal([3, 3, dim_21_fltr, dim_12_fltr], stddev=0.02), name='generator_W13')
-        self.generator_W21 = tf.Variable(tf.random_normal([3, 3, dim_22_fltr, dim_21_fltr], stddev=0.02), name='generator_W21')
-        self.generator_W22 = tf.Variable(tf.random_normal([3, 3, dim_23_fltr, dim_22_fltr], stddev=0.02), name='generator_W22')
-        self.generator_W23 = tf.Variable(tf.random_normal([3, 3, dim_31_fltr, dim_23_fltr], stddev=0.02), name='generator_W23')
-        self.generator_W31 = tf.Variable(tf.random_normal([3, 3, dim_32_fltr, dim_31_fltr], stddev=0.02), name='generator_W31')
-        self.generator_W32 = tf.Variable(tf.random_normal([3, 3, dim_33_fltr, dim_32_fltr], stddev=0.02), name='generator_W32')
-        self.generator_W33 = tf.Variable(tf.random_normal([3, 3, dim_41_fltr, dim_33_fltr], stddev=0.02), name='generator_W33')
-        self.generator_W41 = tf.Variable(tf.random_normal([3, 3, dim_42_fltr, dim_41_fltr], stddev=0.02), name='generator_W41')
-        self.generator_W42 = tf.Variable(tf.random_normal([3, 3, dim_43_fltr, dim_42_fltr], stddev=0.02), name='generator_W42')
-        self.generator_W43 = tf.Variable(tf.random_normal([3, 3, dim_51_fltr, dim_43_fltr], stddev=0.02), name='generator_W43')
-        self.generator_W51 = tf.Variable(tf.random_normal([3, 3, dim_52_fltr, dim_51_fltr], stddev=0.02), name='generator_W51')
-        self.generator_W52 = tf.Variable(tf.random_normal([3, 3, dim_53_fltr, dim_52_fltr], stddev=0.02), name='generator_W52')
-        self.generator_WFC = tf.Variable(tf.random_normal([dim_FC, dim_53_fltr], stddev=0.02), name='generator_WFC')
+        self.generator_W11 = tf.Variable(tf.random_normal([3, 3, image_shape[-1], dim_11_fltr], stddev=0.02), name='generator_W11')
+        self.generator_W12 = tf.Variable(tf.random_normal([3, 3, dim_11_fltr, dim_12_fltr], stddev=0.02), name='generator_W13')
+        self.generator_W21 = tf.Variable(tf.random_normal([3, 3, dim_21_fltr, dim_22_fltr], stddev=0.02), name='generator_W21')
+        self.generator_W22 = tf.Variable(tf.random_normal([3, 3, dim_22_fltr, dim_23_fltr], stddev=0.02), name='generator_W22')
+        self.generator_W23 = tf.Variable(tf.random_normal([3, 3, dim_23_fltr, dim_32_fltr], stddev=0.02), name='generator_W31')
+        self.generator_W32 = tf.Variable(tf.random_normal([3, 3, dim_32_fltr, dim_33_fltr], stddev=0.02), name='generator_W32')
+        self.generator_W33 = tf.Variable(tf.random_normal([3, 3, dim_33_fltr, dim_41_fltr], stddev=0.02), name='generator_W33')
+        self.generator_W41 = tf.Variable(tf.random_normal([3, 3, dim_41_fltr, dim_42_fltr], stddev=0.02), name='generator_W41')
+        self.generator_W42 = tf.Variable(tf.random_normal([3, 3, dim_42_fltr, dim_43_fltr], stddev=0.02), name='generator_W42')
+        self.generator_W43 = tf.Variable(tf.random_normal([3, 3, dim_43_fltr, dim_51_fltr], stddev=0.02), name='generator_W43')
+        self.generator_W51 = tf.Variable(tf.random_normal([3, 3, dim_51_fltr, dim_52_fltr], stddev=0.02), name='generator_W51')
+        self.generator_W52 = tf.Variable(tf.random_normal([3, 3, dim_52_fltr, dim_53_fltr], stddev=0.02), name='generator_W52')
+        self.generator_WFC = tf.Variable(tf.random_normal([dim_FC, dim_53_fltr*6*6], stddev=0.02), name='generator_WFC')
 
-        self.generator_b11 = bias_variable(image_shape[-1], name='gen_b11')
+        self.generator_b11 = bias_variable([image_shape[-1]], name='gen_b11')
         self.generator_b12 = bias_variable([dim_11_fltr], name='gen_b12')
         self.generator_b13 = bias_variable([dim_12_fltr], name='gen_b13')
         self.generator_b21 = bias_variable([dim_21_fltr], name='gen_b21')
@@ -111,15 +110,15 @@ class VDSN_FACE(object):
         self.generator_b43 = bias_variable([dim_43_fltr], name='gen_b43')
         self.generator_b51 = bias_variable([dim_51_fltr], name='gen_b51')
         self.generator_b52 = bias_variable([dim_52_fltr], name='gen_b52')
-        self.generator_bFC = bias_variable([dim_53_fltr], name='gen_bFC')
+        self.generator_bFC = bias_variable([dim_53_fltr*6*6], name='gen_bFC')
 
 
         # Weight of classifier:
-        self.classifier_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02),name='classif_W1')
+        self.classifier_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02), name='classif_W1')
         self.classifier_b1 = bias_variable([self.dim_y], name='cla_b1')
 
         # Weight of discriminator:
-        self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02),name='discrim_W1')
+        self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02), name='discrim_W1')
         self.discrim_b1 = bias_variable([self.dim_y], name='dis_b1')
 
     def build_model(self, gen_disentangle_weight=1, gen_regularizer_weight=1,
@@ -277,7 +276,7 @@ class VDSN_FACE(object):
             h_pool= avg_pool_6x6(h_conv53)
         # Fully connected layer 320 to 512 features
         with tf.name_scope('encoder_fc'):
-            h_pool_flat = tf.reshape(h_pool, [-1, self.dim_FC])
+            h_pool_flat = tf.reshape(h_pool, [-1, self.dim_53_fltr])
             h_fc = lrelu(batchnormalize(tf.matmul(h_pool_flat, self.encoder_WFC) + self.encoder_bFC))
         return h_fc
 
@@ -292,9 +291,9 @@ class VDSN_FACE(object):
             F_combine = tf.concat(axis=1, values=[F_I, F_V])
         with tf.name_scope('gen_FC'):
             h_FC = lrelu(batchnormalize(tf.matmul(F_combine, self.generator_WFC) + self.generator_bFC))
-            h_FC = tf.reshape(h_FC, [-1, 6, 6, self.generator_WFC[3]])
+            h_FC = tf.reshape(h_FC, [-1, 6, 6, self.dim_53_fltr])
         with tf.name_scope('gen_52'):
-            output_shape = [tf.shape(h_FC)[0], 6, 6, self.generator_W52.shape[3]]
+            output_shape = [h_FC.get_shape().as_list()[0], 6, 6, self.generator_W52.shape[3]]
             h_52 = tf.nn.conv2d_transpose(h_FC, self.generator_W52, output_shape=output_shape, strides=[1, 1, 1, 1])
             h_52 = lrelu(batchnormalize(h_52 + self.generator_b52))
         with tf.name_scope('gen_51'):

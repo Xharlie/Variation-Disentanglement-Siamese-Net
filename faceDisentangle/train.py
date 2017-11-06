@@ -2,10 +2,10 @@ import os
 import numpy as np
 from model import *
 from util import *
-from cluster import *
-from load import mnist_with_valid_set
+from web_face_load import *
 from time import localtime, strftime
 import argparse
+import glob
 # import classification_validation
 # import reconst_vali
 import json
@@ -135,13 +135,26 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 n_epochs = args.n_epochs
 
 batch_size = args.batch_size
-image_shape = [28,28,1]
+image_shape = [96, 96, 3]
 # amount of class label
 dim_y=10
-dim_W1 = 128
-dim_W2 = 128
-dim_W3 = 64
-dim_F_I= 64
+dim_11_fltr=32
+dim_12_fltr=64
+dim_21_fltr=64
+dim_22_fltr=64
+dim_23_fltr=128
+dim_31_fltr=128
+dim_32_fltr=96
+dim_33_fltr=192
+dim_41_fltr=192
+dim_42_fltr=128
+dim_43_fltr=256
+dim_51_fltr=256
+dim_52_fltr=160
+dim_53_fltr=320
+dim_FC=512
+dim_F_I=256
+
 time_dir = strftime("%Y-%m-%d-%H-%M-%S", localtime())
 gen_disentangle_weight = args.gen_disentangle_weight
 gen_regularizer_weight = args.gen_regularizer_weight
@@ -159,22 +172,36 @@ model_dir = check_create_dir(args.model_dir_parent + time_dir + '/')
 visualize_dim = batch_size
 drawing_step = args.drawing_step
 
-# train image validation image, test image, train label, validation label, test label
-trX, vaX, teX, trY, vaY, teY = mnist_with_valid_set()
+file_path = "../data/image_sample/*"
+directory_list = glob.glob(file_path)
 
-VDSN_model = VDSN(
-        batch_size=batch_size,
-        image_shape=image_shape,
-        dim_y=dim_y,
-        dim_W1=dim_W1,
-        dim_W2=dim_W2,
-        dim_W3=dim_W3,
-        dim_F_I=dim_F_I,
-        simple_discriminator=args.simple_discriminator,
-        simple_generator=args.simple_generator,
-        simple_classifier=args.simple_classifier,
-        disentangle_obj_func=args.disentangle_obj_func
-)
+dim_y = len(directory_list)
+
+VDSN_model = VDSN_FACE(
+                batch_size=batch_size,
+                image_shape=image_shape,
+                dim_y=dim_y,
+                dim_11_fltr=dim_11_fltr,
+                dim_12_fltr=dim_12_fltr,
+                dim_21_fltr=dim_21_fltr,
+                dim_22_fltr=dim_22_fltr,
+                dim_23_fltr=dim_23_fltr,
+                dim_31_fltr=dim_31_fltr,
+                dim_32_fltr=dim_32_fltr,
+                dim_33_fltr=dim_33_fltr,
+                dim_41_fltr=dim_41_fltr,
+                dim_42_fltr=dim_42_fltr,
+                dim_43_fltr=dim_43_fltr,
+                dim_51_fltr=dim_51_fltr,
+                dim_52_fltr=dim_52_fltr,
+                dim_53_fltr=dim_53_fltr,
+                dim_FC=dim_FC,
+                dim_F_I=dim_F_I,
+                simple_discriminator=args.simple_discriminator,
+                simple_generator=args.simple_generator,
+                simple_classifier=args.simple_classifier,
+                disentangle_obj_func='hybrid'
+                )
 
 Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
     gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
@@ -227,25 +254,17 @@ with tf.Session(config=tf.ConfigProto()) as sess:
             pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
 
         for epoch in range(n_epochs):
-            index = np.arange(len(trY))
-            np.random.shuffle(index)
-            trX = trX[index]
-            trY = trY[index]
+            for i in range(len(directory_list) / batch_size):
+                # # pixel value normalized -> from 0 to 1
+                # Xs_left = trX[start:end].reshape( [-1, 28, 28, 1])
+                # Ys = OneHot(trY[start:end],10)
+                #
+                # Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1])
+                left_images, right_images, labels = web_face_load(directory_list, batch_size)
+                labels = OneHot(directory_list, len(directory_list))
 
-            indexTable = [[] for i in range(10)]
-            for index in range(len(trY)):
-                indexTable[trY[index]].append(index)
-
-            for start, end in zip(
-                    range(0, len(trY), batch_size),
-                    range(batch_size, len(trY), batch_size)
-                    ):
-
-                # pixel value normalized -> from 0 to 1
-                Xs_left = trX[start:end].reshape( [-1, 28, 28, 1]) / 255.
-                Ys = OneHot(trY[start:end],10)
-
-                Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1]) / 255.
+                left_images = left_images.reshape((-1, 96, 96, 3))
+                right_images = right_images.reshape((-1, 96, 96, 3))
 
                 if np.mod( iterations, args.gen_series + args.dis_series ) >= args.dis_series:
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
@@ -255,9 +274,9 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                              gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
                              dis_prediction_tf_left, dis_prediction_tf_right,gen_cla_accuracy_tf],
                             feed_dict={
-                                Y_tf:Ys,
-                                image_tf_real_left: Xs_left,
-                                image_tf_real_right: Xs_right
+                                Y_tf: labels,
+                                image_tf_real_left: left_images,
+                                image_tf_real_right: right_images
                             })
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
                     print("=========== updating G ==========")
@@ -277,9 +296,9 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                             [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf, \
                              dis_prediction_tf_left, dis_prediction_tf_right],
                             feed_dict={
-                                Y_tf:Ys,
-                                image_tf_real_left: Xs_left,
-                                image_tf_real_right: Xs_right
+                                Y_tf: labels,
+                                image_tf_real_left: left_images,
+                                image_tf_real_right: right_images
                                 })
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
                     print("=========== updating D ==========")
@@ -291,16 +310,12 @@ with tf.Session(config=tf.ConfigProto()) as sess:
 
 
                 if np.mod(iterations, drawing_step) == 0:
-                    indexTableVal = [[] for i in range(10)]
-                    for index in range(len(vaY)):
-                        indexTableVal[vaY[index]].append(index)
-                    corrRightVal = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
-                    image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
+                    image_real_left, image_real_right, _ = web_face_load(directory_list, visualize_dim)
                     generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                             [image_gen_left, F_V_left_tf, F_I_left_tf],
                             feed_dict={
                                 image_tf_real_left: image_real_left,
-                                image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
+                                image_tf_real_right: image_real_right
                                 })
                     # since 16 * 8  = batch size * 2
                     save_visualization(image_real_left, generated_samples_left,
@@ -350,14 +365,14 @@ with open(model_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
 
 
 
-if args.validate_disentanglement:
-    tf.reset_default_graph()
-    F_V_classification_conf = copy.deepcopy(F_classification_conf)
-    F_V_classification_conf["feature_selection"] = "F_V"
-    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY)
-
-if args.validate_classification:
-    tf.reset_default_graph()
-    F_I_classification_conf = copy.deepcopy(F_classification_conf)
-    F_I_classification_conf["feature_selection"] = "F_I"
-    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY)
+# if args.validate_disentanglement:
+#     tf.reset_default_graph()
+#     F_V_classification_conf = copy.deepcopy(F_classification_conf)
+#     F_V_classification_conf["feature_selection"] = "F_V"
+#     classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY)
+#
+# if args.validate_classification:
+#     tf.reset_default_graph()
+#     F_I_classification_conf = copy.deepcopy(F_classification_conf)
+#     F_I_classification_conf["feature_selection"] = "F_I"
+#     classification_validation.validate_F_classification(F_I_classification_conf,trX,trY,vaX,vaY,teX,teY)
