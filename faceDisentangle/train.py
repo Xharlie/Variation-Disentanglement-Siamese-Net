@@ -336,25 +336,25 @@ with tf.Session(config=tf.ConfigProto()) as sess:
             gen_regularizer_weight, dis_regularizer_weight, gen_disentangle_weight, time_dir))
         print("Model saved in file: %s" % save_path)
 
-F_classification_conf = {
-    "save_path": save_path,
-    "batch_size": batch_size,
-    "dim_y": dim_y,
-    "dim_W1": dim_W1,
-    "dim_W2": dim_W2,
-    "dim_W3": dim_W3,
-    "dim_F_I": dim_F_I,
-    "dis_regularizer_weight": args.dis_regularizer_weight,
-    "logs_dir_root": args.logs_dir_root,
-    "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
-    "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
-    "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
-    "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
-    "time_dir": time_dir,
-}
-
-# import pdb; pdb.set_trace()
-
+# F_classification_conf = {
+#     "save_path": save_path,
+#     "batch_size": batch_size,
+#     "dim_y": dim_y,
+#     "dim_W1": dim_W1,
+#     "dim_W2": dim_W2,
+#     "dim_W3": dim_W3,
+#     "dim_F_I": dim_F_I,
+#     "dis_regularizer_weight": args.dis_regularizer_weight,
+#     "logs_dir_root": args.logs_dir_root,
+#     "F_V_validation_logs_dir_root": args.F_V_validation_logs_dir_root,
+#     "F_V_validation_n_epochs": args.F_V_validation_n_epochs,
+#     "F_V_validation_learning_rate": args.F_V_validation_learning_rate,
+#     "F_V_validation_test_batch_size": args.F_V_validation_test_batch_size,
+#     "time_dir": time_dir,
+# }
+#
+# # import pdb; pdb.set_trace()
+#
 with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
     json.dump(vars(args), file)
     print("dumped args info to " + training_logs_dir + 'step' + str(iterations) + '_parameter.txt')
