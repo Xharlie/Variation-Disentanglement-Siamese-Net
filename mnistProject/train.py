@@ -209,7 +209,10 @@ train_op_discrim = tf.train.AdamOptimizer(
 iterations = 0
 save_path=""
 
-with tf.Session(config=tf.ConfigProto()) as sess:
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+
+with tf.Session(config=config) as sess:
     try:
         sess.run(tf.global_variables_initializer())
         # writer for tensorboard summary

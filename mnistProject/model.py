@@ -202,9 +202,12 @@ class VDSN(object):
         return h2
 
     def generator(self, F_I,F_V):
-
-        F_combine = tf.concat(axis=1, values=[F_I,F_V])
-        h1 = F_combine
+	F_I = batchnormalize(F_I)
+	F_V = batchnormalize(F_V)
+        # F_combine = tf.concat(axis=1, values=[F_I,F_V])
+        F_combine = tf.add(F_I, F_V)
+	F_combine = tf.concat(axis=1, values=(F_combine, F_combine))
+	h1 = F_combine
         if not self.simple_generator:
             h1 = lrelu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
         h2 = lrelu(batchnormalize(tf.matmul(h1, self.gen_W2)))
@@ -219,8 +222,8 @@ class VDSN(object):
 
     def classifier(self, F_I):
         h1 = F_I
-        if not self.simple_discriminator:
-            h1 = lrelu(batchnormalize(tf.matmul(F_I, self.classifier_W1) + self.classifier_b1))
+        # if not self.simple_discriminator:
+        #    h1 = lrelu(batchnormalize(tf.matmul(F_I, self.classifier_W1) + self.classifier_b1))
             # 512 to 10
         h2 = tf.matmul(h1, self.classifier_W2) + self.classifier_b2
         return h2
