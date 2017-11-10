@@ -202,12 +202,12 @@ class VDSN(object):
         return h2
 
     def generator(self, F_I,F_V):
-	F_I = batchnormalize(F_I)
-	F_V = batchnormalize(F_V)
+        F_I = batchnormalize(F_I)
+        F_V = batchnormalize(F_V)
         # F_combine = tf.concat(axis=1, values=[F_I,F_V])
         F_combine = tf.add(F_I, F_V)
-	F_combine = tf.concat(axis=1, values=(F_combine, F_combine))
-	h1 = F_combine
+        F_combine = tf.concat(axis=1, values=(F_combine, F_combine))
+        h1 = F_combine
         if not self.simple_generator:
             h1 = lrelu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
         h2 = lrelu(batchnormalize(tf.matmul(h1, self.gen_W2)))
