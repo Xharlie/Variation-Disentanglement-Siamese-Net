@@ -60,6 +60,9 @@ class VDSN(object):
         self.classifier_W2 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02), name='classif_W2')
         self.classifier_b2 = bias_variable([self.dim_y], name='cla_b2')
 
+        self.gan_discrimator_W1 = tf.Variable(tf.random_normal([self.dim_W1, self.dim_y+1], stddev=0.02), name='gan_discrim_W1')
+        self.gan_discrimator_b1 = bias_variable([self.dim_y+1], name='gan_dis_b1')
+
 
     def build_model(self, gen_disentangle_weight=1, gen_regularizer_weight=1,
                     dis_regularizer_weight=1, gen_cla_weight=1):
@@ -76,8 +79,8 @@ class VDSN(object):
 
         #  F_V for variance representation
         #  F_I for identity representation
-        F_I_left, F_V_left = tf.split(h_fc1_left, num_or_size_splits=2, axis = 1)
-        F_I_right, F_V_right = tf.split(h_fc1_right, num_or_size_splits=2, axis = 1)
+        F_I_left, F_V_left = tf.split(h_fc1_left, num_or_size_splits=2, axis=1)
+        F_I_right, F_V_right = tf.split(h_fc1_right, num_or_size_splits=2, axis=1)
 
         h4_right = self.generator(F_I_left, F_V_right)
         h4_left = self.generator(F_I_right, F_V_left)
@@ -121,8 +124,8 @@ class VDSN(object):
         gen_disentangle_cost_left = self.gen_disentangle_cost(Y,Y_dis_logits_left)
         gen_disentangle_cost_right = self.gen_disentangle_cost(Y,Y_dis_logits_right)
 
-        gen_cla_cost_left=tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_cla_logits_left))
-        gen_cla_cost_right=tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_cla_logits_right))
+        gen_cla_cost_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_cla_logits_left))
+        gen_cla_cost_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_cla_logits_right))
 
         dis_loss_left = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_dis_logits_left))
         dis_loss_right = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=Y_dis_logits_right))
@@ -138,6 +141,21 @@ class VDSN(object):
         dis_total_cost_tf = dis_cost_tf + dis_regularizer_weight * dis_regularization_loss
         gen_cla_accuracy = (gen_cla_accuracy_left + gen_cla_accuracy_right) / 2
 
+        #### GAN LOSS
+        Y_real = tf.concat(axis=1, values=(Y, tf.zeros([tf.shape(Y)[0], 1])))
+        gan_gen_cost = self.GAN_discriminator(image_gen_left, Y_real)
+
+        Y_fake = tf.concat(axis=1, values=(tf.zeros([tf.shape(Y)[0], self.dim_y]), tf.ones([tf.shape(Y)[0], 1])))
+
+        gan_dis_cost_gen = self.GAN_discriminator(image_gen_left, Y_fake)
+        gan_dis_cost_real = self.GAN_discriminator(image_real_left, Y_real)
+        gan_dis_cost = gan_dis_cost_real + gan_dis_cost_gen
+
+        gan_total_cost = gan_gen_cost \
+                         + gen_disentangle_weight * gen_disentangle_cost \
+                         + gen_cla_weight * gen_cla_cost \
+                         + gen_regularizer_weight * gen_regularization_loss
+
         tf.summary.scalar('gen_recon_cost', gen_recon_cost)
         tf.summary.scalar('gen_disentangle_cost', gen_disentangle_cost)
         tf.summary.scalar('gen_total_cost', gen_total_cost)
@@ -147,11 +165,21 @@ class VDSN(object):
         tf.summary.scalar('dis_prediction_mean', (dis_prediction_left[1] + dis_prediction_right[1])/2 )
         tf.summary.scalar('dis_prediction_min', tf.reduce_min([(dis_prediction_left[2], dis_prediction_right[2])]))
         tf.summary.scalar('gen_cla_accuracy', gen_cla_accuracy)
+        tf.summary.scalar('gan_gen_cost', gan_gen_cost)
+        tf.summary.scalar('gan_total_cost', gan_total_cost)
 
         return Y, image_real_left, image_real_right, gen_recon_cost, gen_disentangle_cost, \
                gen_cla_cost, gen_total_cost, \
                dis_cost_tf, dis_total_cost_tf, image_gen_left, image_gen_right, \
-               dis_prediction_left, dis_prediction_right, gen_cla_accuracy, F_I_left, F_V_left
+               dis_prediction_left, dis_prediction_right, gen_cla_accuracy, F_I_left, F_V_left,\
+               gan_gen_cost, gan_dis_cost, gan_total_cost
+
+    def GAN_discriminator(self, image, Y):
+        h1 = self.encoder(image)
+        h1 = lrelu(batchnormalize(tf.matmul(h1, self.gan_discrimator_W1) + self.gan_discrimator_b1))
+
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=h1))
+        return loss
 
     def gen_disentangle_cost(self, label, logits):
         minus_one_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
@@ -201,12 +229,12 @@ class VDSN(object):
         h2 = tf.matmul(h1, self.discrim_W2) + self.discrim_b2
         return h2
 
-    def generator(self, F_I,F_V):
-        F_I = batchnormalize(F_I)
-        F_V = batchnormalize(F_V)
-        # F_combine = tf.concat(axis=1, values=[F_I,F_V])
-        F_combine = tf.add(F_I, F_V)
-        F_combine = tf.concat(axis=1, values=(F_combine, F_combine))
+    def generator(self, F_I, F_V):
+        # F_I = batchnormalize(F_I)
+        # F_V = batchnormalize(F_V)
+        F_combine = tf.concat(axis=1, values=[F_I,F_V])
+        # F_combine = tf.add(F_I, F_V)
+        # F_combine = tf.concat(axis=1, values=(F_combine, F_combine))
         h1 = F_combine
         if not self.simple_generator:
             h1 = lrelu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
