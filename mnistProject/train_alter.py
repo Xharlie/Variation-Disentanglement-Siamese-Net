@@ -245,7 +245,8 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                 Xs_left = trX[start:end].reshape( [-1, 28, 28, 1]) / 255.
                 Ys = OneHot(trY[start:end],10)
 
-                Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1]) / 255.
+                Xs_right, _ = randomPickRight(start, end, trX, trY, indexTable)
+                Xs_right = Xs_right.reshape( [-1, 28, 28, 1]) / 255.
 
             # if np.mod( iterations, args.gen_series + args.dis_series ) >= args.dis_series:
                 _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
@@ -294,7 +295,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                     indexTableVal = [[] for i in range(10)]
                     for index in range(len(vaY)):
                         indexTableVal[vaY[index]].append(index)
-                    corrRightVal = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
+                    corrRightVal, _ = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
                     image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
                     generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                             [image_gen_left, F_V_left_tf, F_I_left_tf],

@@ -84,8 +84,9 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
         ):
             Xs_left = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
             if conf["feature_selection"]=="F_I_F_V" or conf["feature_selection"]=="F_I_F_D_F_V":
-                Xs_right = randomPickRight(start, end, teX, teY, indexTable,
-                    feature=conf["feature_selection"]).reshape([-1, 28, 28, 1]) / 255.
+                Xs_right, _ = randomPickRight(start, end, teX, teY, indexTable,
+                    feature=conf["feature_selection"])
+                Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
 
                 image_F_I_val, image_F_V_val, image_generated_val = sess.run(
                     [image_F_I_tf, image_F_V_tf, image_generated_tf],
