@@ -30,11 +30,11 @@ class VDSN(object):
         self.disentangle_obj_func=disentangle_obj_func
 
         self.gen_W1 = tf.Variable(tf.random_normal([dim_W1, dim_W2*7*7], stddev=0.02), name='generator_W1')
-        self.gen_b1 = bias_variable([self.dim_F_V], name='gen_b1')
-        self.gen_W2 = tf.Variable(tf.random_normal([5,5,dim_W3,dim_W2], stddev=0.02), name='generator_W2')
-        self.gen_b2 = bias_variable([self.dim_F_V], name='gen_b2')
+        self.gen_b1 = bias_variable([self.dim_W1], name='gen_b1')
+        self.gen_W2 = tf.Variable(tf.random_normal([5,5,dim_W3, dim_W2], stddev=0.02), name='generator_W2')
+        self.gen_b2 = bias_variable([self.dim_W3], name='gen_b2')
         self.gen_W3 = tf.Variable(tf.random_normal([5,5,image_shape[-1],dim_W3], stddev=0.02), name='generator_W3')
-        self.gen_b3 = bias_variable([self.dim_F_V], name='gen_b3')
+        self.gen_b3 = bias_variable([image_shape[-1]], name='gen_b3')
 
         self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
         self.discrim_b1 = bias_variable([self.dim_F_V], name='dis_b1')
@@ -264,13 +264,14 @@ class VDSN(object):
 
     def generator(self, F_I, F_V):
         F_combine = tf.concat(axis=1, values=[F_I, F_V])
-        h1 = lrelu(batchnormalize(tf.matmul(F_combine, self.gen_W1)))
+        h1 = lrelu(batchnormalize(tf.add(tf.matmul(F_combine, self.gen_W1),self.gen_b1)))
         h1 = tf.reshape(h1, [-1,7,7,self.dim_W2])
         output_shape_l3 = [tf.shape(h1)[0],14,14,self.dim_W3]
         h2 = tf.nn.conv2d_transpose(h1, self.gen_W2, output_shape=output_shape_l3, strides=[1,2,2,1])
-        h2 = lrelu(batchnormalize(h2))
+        h2 = lrelu(batchnormalize(tf.add(h2,self.gen_b2)))
         output_shape_l4 = [tf.shape(h2)[0],28,28,self.image_shape[-1]]
-        h3 = tf.nn.conv2d_transpose(h2, self.gen_W3, output_shape=output_shape_l4, strides=[1,2,2,1])
+        h3 = tf.add(tf.nn.conv2d_transpose(
+            h2, self.gen_W3, output_shape=output_shape_l4, strides=[1,2,2,1]), self.gen_b3)
         return h3
 
     def classifier(self, F_I):
