@@ -213,7 +213,7 @@ train_op_gan_gen = tf.train.AdamOptimizer(
     gan_learning_rate, beta1=0.5).minimize(
     gan_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
 
-# not update global step since we considert gan as a whole step
+# not update global step since we considered gan as a whole step
 train_op_gan_discrim = tf.train.AdamOptimizer(
     gan_learning_rate, beta1=0.5).minimize(
     gan_dis_cost_tf, var_list=gan_dis_vars)

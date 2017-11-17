@@ -100,7 +100,7 @@ class VDSN(object):
         gen_cla_correct_prediction_right = tf.equal(tf.argmax(Y_cla_logits_right, 1), tf.argmax(Y_right, 1))
         gen_cla_accuracy_right = tf.reduce_mean(tf.cast(gen_cla_correct_prediction_right, tf.float32))
 
-        gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
+        gen_vars = filter(lambda x: x.name.startswith('generator'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
         discriminator_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
         classifier_vars = filter(lambda x: x.name.startswith('classif'), tf.trainable_variables())
@@ -117,7 +117,7 @@ class VDSN(object):
             regularizer, weights_list=discriminator_vars)
         
         gen_recon_cost_left = tf.nn.l2_loss(image_real_left - image_gen_left) / self.batch_size
-        gen_recon_cost_right = tf.nn.l2_loss(image_real_left - image_gen_left) / self.batch_size
+        gen_recon_cost_right = tf.nn.l2_loss(image_real_right - image_gen_right) / self.batch_size
 
         gen_disentangle_cost_left = self.gen_disentangle_cost(Y_left,Y_dis_logits_left)
         gen_disentangle_cost_right = self.gen_disentangle_cost(Y_right,Y_dis_logits_right)
@@ -210,7 +210,7 @@ class VDSN(object):
             h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.gan_dis_W3) + self.gan_dis_b3))
 
         with tf.name_scope('gan_dis_fc2'):
-            h_fc2 = lrelu(batchnormalize(tf.matmul(h_fc1, self.gan_dis_W4) + self.gan_dis_b4))
+            h_fc2 = tf.matmul(h_fc1, self.gan_dis_W4) + self.gan_dis_b4
 
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=h_fc2))
         return loss
