@@ -73,7 +73,7 @@ parser.add_argument("--dis_series", nargs='?', type=int, default=10,
 parser.add_argument("--gan_series", nargs='?', type=int, default=1,
                     help="how many time the generator with gan task can train consecutively")
 
-parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
+parser.add_argument("--drawing_step", nargs='?', type=int, default=10000,
                     help="how many steps to draw a comparision pic")
 
 parser.add_argument("--gen_regularizer_weight", nargs='?', type=float, default=0.01,
@@ -155,6 +155,7 @@ check_create_dir(args.logs_dir_root)
 check_create_dir(args.logs_dir_root + args.main_logs_dir_root)
 check_create_dir(args.model_dir_parent)
 check_create_dir(args.pic_dir_parent)
+check_create_dir(args.pic_dir_parent+time_dir)
 
 training_logs_dir = check_create_dir(args.logs_dir_root + args.main_logs_dir_root + time_dir + '/')
 model_dir = check_create_dir(args.model_dir_parent + time_dir + '/')
@@ -263,7 +264,7 @@ with tf.Session(config=config) as sess:
                     Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable)
                     Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
                 else:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable, "F_I_F_D_F_V")
+                    Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_D_F_V")
                     Ys_right = OneHot(Ys_right, 10)
                     Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
                 if modulus < args.recon_series:
@@ -314,7 +315,7 @@ with tf.Session(config=config) as sess:
                         indexTableVal = [[] for i in range(10)]
                         for index in range(len(vaY)):
                             indexTableVal[vaY[index]].append(index)
-                        corrRightVal, _  = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
+                        corrRightVal, _ = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
                         image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
                         generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                                 [image_gen_left, F_V_left_tf, F_I_left_tf],
@@ -323,10 +324,12 @@ with tf.Session(config=config) as sess:
                                     image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
                                     })
                         # since 16 * 8  = batch size * 2
-                        save_visualization(image_real_left, generated_samples_left,
-                                           (int(math.ceil(batch_size ** (.5))),
-                                            int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
-                                           save_path=args.pic_dir_parent + 'sample_%04d.jpg' % int(iterations))
+                        save_visualization_triplet(image_real_left, corrRightVal.reshape([-1, 28, 28, 1]) / 255,
+                                                   generated_samples_left,
+                                                   (int(math.ceil(batch_size ** (.5))),
+                                                    int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
+                                                   save_path=args.pic_dir_parent + + time_dir + '/sample_%04d.jpg' % int(
+                                                       iterations))
                 else:
                     # start to train gan, D first
                     _, summary, gan_dis_cost \
