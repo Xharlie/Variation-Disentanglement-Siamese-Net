@@ -30,7 +30,7 @@ class VDSN(object):
         self.disentangle_obj_func=disentangle_obj_func
 
         self.gen_W1 = tf.Variable(tf.random_normal([dim_W1, dim_W2*7*7], stddev=0.02), name='generator_W1')
-        self.gen_b1 = bias_variable([self.dim_W1], name='gen_b1')
+        self.gen_b1 = bias_variable([self.dim_W2*7*7], name='gen_b1')
         self.gen_W2 = tf.Variable(tf.random_normal([5,5,dim_W3, dim_W2], stddev=0.02), name='generator_W2')
         self.gen_b2 = bias_variable([self.dim_W3], name='gen_b2')
         self.gen_W3 = tf.Variable(tf.random_normal([5,5,image_shape[-1],dim_W3], stddev=0.02), name='generator_W3')
@@ -263,13 +263,18 @@ class VDSN(object):
         return h2
 
     def generator(self, F_I, F_V):
+        # F_combine 1*128
         F_combine = tf.concat(axis=1, values=[F_I, F_V])
+        # h1 1* dim_W2*7*7
         h1 = lrelu(batchnormalize(tf.add(tf.matmul(F_combine, self.gen_W1),self.gen_b1)))
+        # h1 7*7*dim_W2
         h1 = tf.reshape(h1, [-1,7,7,self.dim_W2])
         output_shape_l3 = [tf.shape(h1)[0],14,14,self.dim_W3]
+        # h2 14*14*dim_W3
         h2 = tf.nn.conv2d_transpose(h1, self.gen_W2, output_shape=output_shape_l3, strides=[1,2,2,1])
         h2 = lrelu(batchnormalize(tf.add(h2,self.gen_b2)))
         output_shape_l4 = [tf.shape(h2)[0],28,28,self.image_shape[-1]]
+        # h3 28*28*3
         h3 = tf.add(tf.nn.conv2d_transpose(
             h2, self.gen_W3, output_shape=output_shape_l4, strides=[1,2,2,1]), self.gen_b3)
         return h3
