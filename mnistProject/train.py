@@ -328,7 +328,7 @@ with tf.Session(config=config) as sess:
                                                    generated_samples_left,
                                                    (int(math.ceil(batch_size ** (.5))),
                                                     int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
-                                                   save_path=args.pic_dir_parent + + time_dir + '/sample_%04d.jpg' % int(
+                                                   save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(
                                                        iterations))
                 else:
                     # start to train gan, D first
