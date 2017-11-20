@@ -156,18 +156,15 @@ VDSN_model = VDSN(
         dim_W2=dim_W2,
         dim_W3=dim_W3,
         dim_F_I=dim_F_I,
-        simple_discriminator=args.simple_discriminator,
-        simple_generator=args.simple_generator,
-        simple_classifier=args.simple_classifier,
         disentangle_obj_func=args.disentangle_obj_func
 )
 
-Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
+Y_left_tf, Y_right_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
     gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
     image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf, \
-    F_I_left_tf, F_V_left_tf,\
+    F_I_left_tf, F_V_left_tf, gan_gen_cost_tf, gan_dis_cost_tf, gan_total_cost_tf\
     = VDSN_model.build_model(
-    gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
+        gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
 
 # saver to save trained model to disk
 saver = tf.train.Saver(max_to_keep=10)
