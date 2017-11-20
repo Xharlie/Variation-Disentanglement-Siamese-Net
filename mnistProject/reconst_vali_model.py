@@ -44,17 +44,20 @@ class reconst_validation_model(model.VDSN):
         #  we r gonna show them side by side
 
         if feature_selection=="F_I_F_V" or feature_selection=="F_I_F_D_F_V":
-            h_fc1_left = self.encoder(image_real_left)
-            h_fc1_right = self.encoder(image_real_right)
-            F_I_left, F_V_left = tf.split(h_fc1_left, num_or_size_splits=2, axis=1)
-            F_I_right, F_V_right = tf.split(h_fc1_right, num_or_size_splits=2, axis=1)
+            # h_fc1_left = self.encoder(image_real_left)
+            # h_fc1_right = self.encoder(image_real_right)
+            # F_I_left, F_V_left = tf.split(h_fc1_left, num_or_size_splits=2, axis=1)
+            # F_I_right, F_V_right = tf.split(h_fc1_right, num_or_size_splits=2, axis=1)
+
+            F_I_left, F_V_left = self.encoder(image_real_left)
+            F_I_right, F_V_right = self.encoder(image_real_right)
+
             h4_validation = self.generator(F_I_left, F_V_right)
             image_F_I = image_real_left
             image_F_V = image_real_right
             image_generated = tf.nn.sigmoid(h4_validation)
         else:
-            h_fc1_left = self.encoder(image_real_left)
-            F_I_left, F_V_left = tf.split(h_fc1_left, num_or_size_splits=2, axis=1)
+            F_I_left, F_V_left = self.encoder(image_real_left)
             h4_validation = self.generator(F_I_left, center_representation)
             image_F_I = image_real_left
             image_F_V = tf.nn.sigmoid(self.generator(

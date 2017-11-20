@@ -44,7 +44,11 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
     # include en_* and encoder_* W and b,
     encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
     iterations = 0
-    with tf.Session(config=tf.ConfigProto()) as sess:
+
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
+    with tf.Session(config=config) as sess:
         sess.run(tf.global_variables_initializer())
         indexTable = [[] for i in range(10)]
         if (len(conf["save_path"])>0):
