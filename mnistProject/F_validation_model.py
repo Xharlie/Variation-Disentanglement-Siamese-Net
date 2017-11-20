@@ -33,11 +33,7 @@ class F_validation(model.VDSN):
         Y = tf.placeholder(tf.float32, [None, self.dim_y])
 
         image_real = tf.placeholder(tf.float32, [None] + self.image_shape)
-        h_fc1 = self.encoder(image_real)
-
-        #  F_V for variance representation
-        #  F_I for identity representation
-        F_I, F_V = tf.split(h_fc1, num_or_size_splits=2, axis=1)
+        F_I, F_V = self.encoder(image_real)
 
         F_target = F_V
         if feature_selection == 'F_I':
