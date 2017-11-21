@@ -317,6 +317,7 @@ with tf.Session(config=config) as sess:
                             indexTableVal[vaY[index]].append(index)
                         corrRightVal, _ = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
                         image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
+                        VDSN_model.is_training=False
                         generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                                 [image_gen_left, F_V_left_tf, F_I_left_tf],
                                 feed_dict={
@@ -330,6 +331,7 @@ with tf.Session(config=config) as sess:
                                                     int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
                                                    save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(
                                                        iterations))
+                        VDSN_model.is_training = True
                 else:
                     # start to train gan, D first
                     _, summary, gan_dis_cost \
