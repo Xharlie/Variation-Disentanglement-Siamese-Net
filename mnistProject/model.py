@@ -82,11 +82,11 @@ class VDSN(object):
         image_gen_left = tf.nn.sigmoid(h3_left)
         image_gen_right = tf.nn.sigmoid(h3_right)
 
-        Y_dis_logits_left = self.discriminator(F_V_left, reuse=True)
+        Y_dis_logits_left = self.discriminator(F_V_left, reuse=False)
         Y_dis_logits_right = self.discriminator(F_V_right, reuse=True)
 
-        Y_cla_logits_left = self.classifier(F_I_left, reuse=True)
-        Y_cla_logits_right = self.classifier(F_I_right, reuse=False)
+        Y_cla_logits_left = self.classifier(F_I_left, reuse=False)
+        Y_cla_logits_right = self.classifier(F_I_right, reuse=True)
 
         Y_dis_result_left = tf.reduce_sum(Y_left * tf.nn.softmax(Y_dis_logits_left), axis=1)
         Y_dis_result_right = tf.reduce_sum(Y_right * tf.nn.softmax(Y_dis_logits_right), axis=1)
