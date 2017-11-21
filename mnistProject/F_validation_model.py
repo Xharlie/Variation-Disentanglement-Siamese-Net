@@ -33,13 +33,13 @@ class F_validation(model.VDSN):
         Y = tf.placeholder(tf.float32, [None, self.dim_y])
 
         image_real = tf.placeholder(tf.float32, [None] + self.image_shape)
-        F_I, F_V = self.encoder(image_real)
+        F_I, F_V = self.encoder(image_real,reuse=False)
 
         F_target = F_V
         if feature_selection == 'F_I':
             F_target = F_I
 
-        Y_logits = self.discriminator(F_target)
+        Y_logits = self.discriminator(F_target,reuse=False)
         Y_prediction_prob = tf.nn.softmax(Y_logits)
 
         discriminator_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
