@@ -146,18 +146,18 @@ class VDSN(object):
         #### GAN LOSS
         Y_real_right = tf.concat(axis=1, values=(Y_right, tf.zeros([tf.shape(Y_right)[0], 1])))
         Y_real_left = tf.concat(axis=1, values=(Y_left, tf.zeros([tf.shape(Y_left)[0], 1])))
-        gan_gen_cost = (self.GAN_discriminator(image_gen_left, Y_real_right, reuse=True)
-                        + self.GAN_discriminator(image_gen_right, Y_real_left, reuse=False))/2
+        gan_gen_cost = (self.GAN_discriminator(image_gen_left, Y_real_right, reuse=False)
+                        + self.GAN_discriminator(image_gen_right, Y_real_left, reuse=True))/2
 
         Y_fake_left = tf.concat(axis=1, values=(tf.zeros([tf.shape(Y_right)[0], self.dim_y]),
                                                 tf.ones([tf.shape(Y_right)[0], 1])))
         Y_fake_right = tf.concat(axis=1, values=(tf.zeros([tf.shape(Y_left)[0], self.dim_y]),
                                                  tf.ones([tf.shape(Y_left)[0], 1])))
 
-        gan_dis_cost_gen = (self.GAN_discriminator(image_gen_left, Y_fake_left, reuse=False)
-                                + self.GAN_discriminator(image_gen_right, Y_fake_right, reuse=False)) / 2
-        gan_dis_cost_real = (self.GAN_discriminator(image_real_left, Y_real_left, reuse=False)
-                            + self.GAN_discriminator(image_real_right, Y_real_right, reuse=False)) / 2
+        gan_dis_cost_gen = (self.GAN_discriminator(image_gen_left, Y_fake_left, reuse=True)
+                                + self.GAN_discriminator(image_gen_right, Y_fake_right, reuse=True)) / 2
+        gan_dis_cost_real = (self.GAN_discriminator(image_real_left, Y_real_left, reuse=True)
+                            + self.GAN_discriminator(image_real_right, Y_real_right, reuse=True)) / 2
         gan_dis_cost = gan_dis_cost_real + gan_dis_cost_gen \
                        + gen_regularizer_weight * gan_dis_regularization_loss
 
