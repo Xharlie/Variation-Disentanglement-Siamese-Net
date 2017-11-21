@@ -17,11 +17,6 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
     global image_generated_val
     check_create_dir(conf["logs_dir_root"])
     check_create_dir(conf["logs_dir_root"] + conf["F_validation_logs_dir_root"])
-    training_logs_dir = check_create_dir(conf["logs_dir_root"]
-                      + conf["F_validation_logs_dir_root"]+conf["time_dir"]+'/')
-
-    # test_logs_dir = check_create_dir(conf["logs_dir_root"]
-    #                  + conf["F_V_validation_logs_dir_root"]+'test/')
 
     reconst_vali_model = reconst_validation_model(
         batch_size=conf["batch_size"],
@@ -32,9 +27,14 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
         dim_W3=conf["dim_W3"],
         dim_F_I=conf["dim_F_I"]
     )
+    reconst_vali_model.is_training = False
     check_create_dir(args.pic_dir_parent)
+    pic_dir=args.pic_dir_parent + conf["save_path"].split('/')[-2] + '/'
+    check_create_dir(pic_dir)
+    pic_dir=pic_dir + args.feature_selection + '/'
+    check_create_dir(pic_dir)
     Y_tf, center_representation_tf, image_real_left_tf, \
-    image_real_right_tf, image_F_I_tf, image_F_V_tf, image_generated_tf \
+    image_real_right_tf, image_F_I_tf, image_F_V_tf, image_generated_tf, F_I_left_tf, F_V_left_tf \
         = reconst_vali_model.build_model(conf["feature_selection"])
 
     global_step = tf.Variable(0, trainable=False)
@@ -48,9 +48,12 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
+    teX, teY = sort_by_identity(teX, teY)
     with tf.Session(config=config) as sess:
         sess.run(tf.global_variables_initializer())
         indexTable = [[] for i in range(10)]
+        for index in range(len(teY)):
+            indexTable[teY[index]].append(index)
         if (len(conf["save_path"])>0):
             # Create a saver. include gen_vars and encoder_vars
             saver = tf.train.Saver(gen_vars + encoder_vars)
@@ -59,10 +62,7 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
         class_center_representations \
             = np.zeros((conf["dim_y"], conf["dim_W1"] - conf["dim_F_I"]))
 
-        if conf["feature_selection"]=="F_I_F_V" or conf["feature_selection"]=="F_I_F_D_F_V":
-            for index in range(len(teY)):
-                indexTable[teY[index]].append(index)
-        else:
+        if conf["feature_selection"]=="F_I_C" or conf["feature_selection"]=="F_I_0":
             class_count = np.zeros(conf["dim_y"])
             if conf["feature_selection"]=="F_I_C":
                 Y_tf_class, image_real_tf_class, F_I_tf_class, F_V_tf_class \
@@ -82,41 +82,69 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
                         class_center_representations[int(Y_tf_class_val[i])] += F_V_tf_class_val[i]
                 class_center_representations = class_center_representations / class_count[:,None]
 
-        for start, end in zip(
-                range(0, len(teX), conf["batch_size"]),
-                range(conf["batch_size"], len(teX), conf["batch_size"])
-        ):
-            Xs_left = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
-            if conf["feature_selection"]=="F_I_F_V" or conf["feature_selection"]=="F_I_F_D_F_V":
-                Xs_right, _ = randomPickRight(start, end, teX, teY, indexTable,
-                    feature=conf["feature_selection"])
-                Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
+        if conf["feature_selection"]=="interpolation":
+            F_I_tf, F_V_tf, img_gen_tf = reconst_vali_model.feature_2_img()
+            for i in range(len(indexTable)):
+                Xs_left = teX[indexTable[i][i]].reshape([-1, 28, 28, 1]) / 255.
+                F_I_left_val, F_V_left_val = sess.run(
+                    [F_I_left_tf, F_V_left_tf],
+                    feed_dict={image_real_left_tf: Xs_left})
+                print F_I_left_val
+                for j in range(len(indexTable)):
+                    Xs_right = teX[indexTable[j][-1]].reshape([-1, 28, 28, 1]) / 255.
+                    F_I_right_val, F_V_right_val = sess.run(
+                        [F_I_left_tf, F_V_left_tf],
+                        feed_dict={image_real_left_tf: Xs_right})
+                    F_I_step = (F_I_right_val - F_I_left_val) / 20.
+                    F_V_step = (F_V_right_val - F_V_left_val) / 20.
+                    img_matrix = []
+                    for r in range(21):
+                        img_matrix.append([])
+                        for c in range(21):
+                            img_gen_val = sess.run(
+                                img_gen_tf,
+                                feed_dict={F_I_tf: F_I_left_val + r * F_I_step,
+                                           F_V_tf: F_V_left_val + c * F_V_step})
+                            img_matrix[r].append(img_gen_val[0])
+                    save_visualization_interpolation(img_matrix,
+                         save_path=pic_dir + '{}_{}.jpg'.format(indexTable[i][i], indexTable[j][-1]))
+        else:
+            for start, end in zip(
+                    range(0, len(teX), conf["batch_size"]),
+                    range(conf["batch_size"], len(teX), conf["batch_size"])
+            ):
+                Xs_left = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
 
-                image_F_I_val, image_F_V_val, image_generated_val = sess.run(
-                    [image_F_I_tf, image_F_V_tf, image_generated_tf],
-                    feed_dict={
-                        image_real_left_tf: Xs_left,
-                        image_real_right_tf: Xs_right
+                if conf["feature_selection"]=="F_I_F_V" or conf["feature_selection"]=="F_I_F_D_F_V":
+                    Xs_right, _ = randomPickRight(start, end, teX, teY, indexTable,
+                        feature=conf["feature_selection"])
+                    Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
+
+                    image_F_I_val, image_F_V_val, image_generated_val = sess.run(
+                        [image_F_I_tf, image_F_V_tf, image_generated_tf],
+                        feed_dict={
+                            image_real_left_tf: Xs_left,
+                            image_real_right_tf: Xs_right
+                            })
+                    save_visualization_triplet(image_F_I_val, image_F_V_val, image_generated_val,
+                       (int(math.ceil(conf['batch_size'] ** (.5))),
+                        int(math.ceil(conf['batch_size'] / math.ceil(conf['batch_size'] ** (.5))))),
+                            save_path=pic_dir + '%04d.jpg' % int(
+                                                   iterations))
+                else:
+                    center_representation = class_center_representations[teY[start:end]]
+                    image_F_I_val, image_F_V_val, image_generated_val = sess.run(
+                        [image_F_I_tf, image_F_V_tf, image_generated_tf],
+                        feed_dict={
+                            image_real_left_tf: Xs_left,
+                            center_representation_tf: center_representation
                         })
-                save_visualization_triplet(image_F_I_val, image_F_V_val, image_generated_val,
-                   (int(math.ceil(conf['batch_size'] ** (.5))),
-                    int(math.ceil(conf['batch_size'] / math.ceil(conf['batch_size'] ** (.5))))),
-                        save_path=args.pic_dir_parent + args.feature_selection + '_%04d.jpg' % int(
-                                               iterations))
-            else:
-                center_representation = class_center_representations[teY[start:end]]
-                image_F_I_val, image_F_V_val, image_generated_val = sess.run(
-                    [image_F_I_tf, image_F_V_tf, image_generated_tf],
-                    feed_dict={
-                        image_real_left_tf: Xs_left,
-                        center_representation_tf: center_representation
-                    })
-                save_visualization_triplet(image_F_I_val, image_F_V_val, image_generated_val,
-                   (int(math.ceil(conf['batch_size'] ** (.5))),
-                    int(math.ceil(conf['batch_size'] / math.ceil(conf['batch_size'] ** (.5))))),
-                   save_path=args.pic_dir_parent + args.feature_selection + '_%04d.jpg' % int(
-                       iterations))
-            iterations += 1
+                    save_visualization_triplet(image_F_I_val, image_F_V_val, image_generated_val,
+                       (int(math.ceil(conf['batch_size'] ** (.5))),
+                        int(math.ceil(conf['batch_size'] / math.ceil(conf['batch_size'] ** (.5))))),
+                       save_path=pic_dir  + '%04d.jpg' % int(
+                           iterations))
+                iterations += 1
 
 
 if __name__ == "__main__":
@@ -148,7 +176,8 @@ if __name__ == "__main__":
                         help="to validate F_I_0 for F_I and 00," +
                              " or F_I_F_V for F_I and F_V,  " +
                              "F_I_C for F_I and F center " +
-                             "F_I_F_D_F_V for F_I with F_V from different digit"
+                             "F_I_F_D_F_V for F_I with F_V from different digit" +
+                             "interpolation for F_I,F_V interpolation"
                         )
 
     parser.add_argument("--logs_dir_root", nargs='?', type=str, default='tensorflow_log/',
