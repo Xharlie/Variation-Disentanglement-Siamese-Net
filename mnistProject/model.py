@@ -196,7 +196,7 @@ class VDSN(object):
 
         # Second convolutional layer -- maps 64 feature maps to 128.
         with tf.name_scope('gan_dis_conv2'):
-            h_conv2 = tf.nn.conv2d(h_pool1, self.gan_dis_W2, strides=[1, 1, 1, 1], padding='SAME') + self.gan_dis_b2
+            h_conv2 = tf.nn.conv2d(h_pool1, self.gan_dis_W2, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_dis_b2
             h_conv2 = lrelu(batchnormalize(h_conv2,'gan_dis_bn1', train=self.is_training, reuse=reuse))
 
         # Second pooling layer.
@@ -207,8 +207,8 @@ class VDSN(object):
         # is down to 7x7x64 feature maps -- maps this to 1024 features.
         with tf.name_scope('gan_dis_fc1'):
             h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
-            h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.gan_dis_W3) + self.gan_dis_b3,
-                                         'gan_dis_bn2', train=self.is_training, reuse=reuse))
+            h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.gan_dis_W3) # + self.gan_dis_b3
+                                         ,'gan_dis_bn2', train=self.is_training, reuse=reuse))
 
         with tf.name_scope('gan_dis_fc2'):
             h_fc2 = tf.matmul(h_fc1, self.gan_dis_W4) + self.gan_dis_b4
@@ -239,7 +239,7 @@ class VDSN(object):
 
         # Second convolutional layer -- maps 64 feature maps to 128.
         with tf.name_scope('encoder_conv2'):
-            h_conv2 = tf.nn.conv2d(h_pool1, self.encoder_W2, strides=[1, 1, 1, 1], padding='SAME')+self.encoder_b2
+            h_conv2 = tf.nn.conv2d(h_pool1, self.encoder_W2, strides=[1, 1, 1, 1], padding='SAME') # +self.encoder_b2
             h_conv2 = lrelu(batchnormalize(h_conv2, 'en_bn1', train=self.is_training, reuse=reuse))
 
         # Second pooling layer.
@@ -251,15 +251,16 @@ class VDSN(object):
 
         with tf.name_scope('encoder_fc1'):
             h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
-            h_fc1 = lrelu(batchnormalize(tf.matmul(
-                h_pool2_flat, self.encoder_W3) + self.encoder_b3, 'en_bn2', train=self.is_training, reuse=reuse))
+            h_fc1 = lrelu(batchnormalize(tf.matmul( h_pool2_flat, self.encoder_W3) # + self.encoder_b3
+                                         ,'en_bn2', train=self.is_training, reuse=reuse))
 
         F_I, F_V = tf.split(h_fc1, [self.dim_F_I, self.dim_W1 - self.dim_F_I], axis=1)
         return batchnormalize(F_I, 'en_bn3', train=self.is_training, reuse=reuse), batchnormalize(F_V,'en_bn4', train=self.is_training, reuse=reuse)
 
     def discriminator(self, F_V, reuse=False):
         # 512 to 512
-        h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1,'dis_bn1', train=self.is_training, reuse=reuse))
+        h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) # + self.discrim_b1
+                                  ,'dis_bn1', train=self.is_training, reuse=reuse))
             # 512 to 10
         h2 = tf.matmul(h1, self.discrim_W2) + self.discrim_b2
         return h2
@@ -268,13 +269,14 @@ class VDSN(object):
         # F_combine 1*128
         F_combine = tf.concat(axis=1, values=[F_I, F_V])
         # h1 1* dim_W2*7*7
-        h1 = lrelu(batchnormalize(tf.add(tf.matmul(F_combine, self.gen_W1),self.gen_b1),'gen_bn1', train=self.is_training, reuse=reuse))
+        h1 = lrelu(batchnormalize(tf.matmul(F_combine, self.gen_W1) # + self.gen_b1
+                                  ,'gen_bn1', train=self.is_training, reuse=reuse))
         # h1 7*7*dim_W2
         h1 = tf.reshape(h1, [-1,7,7,self.dim_W2])
-        output_shape_l3 = [tf.shape(h1)[0],14,14,self.dim_W3]
+        output_shape_l3 = [self.batch_size,14,14,self.dim_W3]
         # h2 14*14*dim_W3
-        h2 = tf.nn.conv2d_transpose(h1, self.gen_W2, output_shape=output_shape_l3, strides=[1,2,2,1])
-        h2 = lrelu(batchnormalize(tf.add(h2,self.gen_b2),'gen_bn2', train=self.is_training, reuse=reuse))
+        h2 = tf.nn.conv2d_transpose(h1, self.gen_W2, output_shape=output_shape_l3, strides=[1,2,2,1]) # + self.gen_b2
+        h2 = lrelu(batchnormalize(h2,'gen_bn2', train=self.is_training, reuse=reuse))
         output_shape_l4 = [tf.shape(h2)[0],28,28,self.image_shape[-1]]
         # h3 28*28*3
         h3 = tf.add(tf.nn.conv2d_transpose(

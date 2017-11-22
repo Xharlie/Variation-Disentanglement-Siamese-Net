@@ -46,7 +46,7 @@ def save_visualization(X_origin, X, nh_nw, save_path='./vis/sample.jpg'):
     scipy.misc.imsave(save_path, img)
 
 def save_visualization_triplet(X_I, X_V, X, nh_nw, save_path='./vis_triple/sample.jpg'):
-    h,w = X.shape[1], X.shape[2]
+    h,w = X_I.shape[1], X_I.shape[2]
     img = np.zeros((h * nh_nw[0], w * 3 * nh_nw[1], 3))
 
     for n in range(X.shape[0]):
@@ -58,7 +58,7 @@ def save_visualization_triplet(X_I, X_V, X, nh_nw, save_path='./vis_triple/sampl
         img[j*h:j*h+h, (3*i)*w:(3*i+1)*w, :] = X_I[n]
         img[j*h:j*h+h, (3*i+1)*w:(3*i+2)*w, :] = X_V[n]
         img[j*h:j*h+h, (3*i+2)*w:(3*i+3)*w, :] = X[n]
-    draw_frame(img, 1)
+    draw_frame(img, w, 1)
     scipy.misc.imsave(save_path, img)
 
 def save_visualization_interpolation(img_matrix, save_path='./vis_triple/sample.jpg'):
@@ -111,7 +111,7 @@ def sort_by_identity(teX, teY):
             sort_index.append(indexTable[i][j])
     return teX[sort_index], teY[sort_index]
 
-def draw_frame(img, channel):
+def draw_frame(img, w, channel):
     for i in range(img.shape[1] / 3):
-        img[i*3:i*3 + 2, :, channel] = 255
+        img[:, i*3*w:(i * 3 + 2) * w, channel] = 255
     return img

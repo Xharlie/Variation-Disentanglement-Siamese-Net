@@ -2,6 +2,7 @@ import os
 import numpy as np
 from model import *
 from util import *
+from neural_helper import *
 from cluster import *
 from load import mnist_with_valid_set
 from time import localtime, strftime
@@ -195,29 +196,34 @@ dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, glo
 gan_learning_rate = tf.train.exponential_decay(args.gan_start_learning_rate, global_step,
                                                args.gan_decay_step, args.gan_decay_rate, staircase=True)
 
+print [x.name for x in tf.trainable_variables() if x.name.startswith('gan')]
+
 dis_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
 gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
 cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
 gan_dis_vars = filter(lambda x: x.name.startswith('gan'), tf.trainable_variables())
-
 # include en_* and encoder_* W and b,
 encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
 
-train_op_gen = tf.train.AdamOptimizer(
-    gen_learning_rate, beta1=0.5).minimize(
-    gen_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
+with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
+    train_op_gen = tf.train.AdamOptimizer(
+        gen_learning_rate, beta1=0.5).minimize(
+        gen_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
 
-train_op_discrim = tf.train.AdamOptimizer(
-    dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
+with tf.control_dependencies(tf.get_collection(ADV_BATCH_NORM_OPS)):
+    train_op_discrim = tf.train.AdamOptimizer(
+        dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
 
-train_op_gan_gen = tf.train.AdamOptimizer(
-    gan_learning_rate, beta1=0.5).minimize(
-    gan_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
+with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
+    train_op_gan_gen = tf.train.AdamOptimizer(
+        gan_learning_rate, beta1=0.5).minimize(
+        gan_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
 
-# not update global step since we considered gan as a whole step
-train_op_gan_discrim = tf.train.AdamOptimizer(
-    gan_learning_rate, beta1=0.5).minimize(
-    gan_dis_cost_tf, var_list=gan_dis_vars)
+with tf.control_dependencies(tf.get_collection(DIS_BATCH_NORM_OPS)):
+    # not update global step since we considered gan as a whole step
+    train_op_gan_discrim = tf.train.AdamOptimizer(
+        gan_learning_rate, beta1=0.5).minimize(
+        gan_dis_cost_tf, var_list=gan_dis_vars)
 
 iterations = 0
 save_path=""
@@ -290,7 +296,8 @@ with tf.Session(config=config) as sess:
                     print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
                     print("gen id classifier accuracy:", gen_cla_accuracy_val)
-
+                    # moving_mean = filter(lambda x: x.name.startswith('en_bn1/moving_mean'), tf.all_variables())[0]
+                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
                 elif modulus < args.recon_series + args.dis_series:
                     _, summary, dis_cost_val, dis_total_cost_val, \
                             dis_prediction_val_left, dis_prediction_val_right \
@@ -310,14 +317,15 @@ with tf.Session(config=config) as sess:
                     print("discriminator total weigthted loss:", dis_total_cost_val)
                     print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
-
+                    # moving_mean = filter(lambda x: x.name.startswith('dis_bn1/moving_mean'), tf.all_variables())[0]
+                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
                     if np.mod(iterations, drawing_step) == 0:
                         indexTableVal = [[] for i in range(10)]
                         for index in range(len(vaY)):
                             indexTableVal[vaY[index]].append(index)
                         corrRightVal, _ = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
                         image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
-                        VDSN_model.is_training=False
+                        VDSN_model.is_training = False
                         generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                                 [image_gen_left, F_V_left_tf, F_I_left_tf],
                                 feed_dict={
@@ -347,6 +355,8 @@ with tf.Session(config=config) as sess:
                     print("=========== updating gan D ==========")
                     print("iteration:", iterations)
                     print("gan_dis_cost:", gan_dis_cost)
+                    # moving_mean = filter(lambda x: x.name.startswith('gan_dis_bn1/moving_mean'), tf.all_variables())[0]
+                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
                     # train G
                     _, summary, gan_gen_cost_val, gen_disentangle_val, gen_cla_cost_val, gan_total_cost_val, \
                     dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
@@ -369,6 +379,8 @@ with tf.Session(config=config) as sess:
                     print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
                     print("gen id classifier accuracy:", gen_cla_accuracy_val)
+                    # moving_mean = filter(lambda x: x.name.startswith('en/moving_mean'), tf.all_variables())[0]
+                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
                 iterations += 1
 
         # Save the variables to disk.
