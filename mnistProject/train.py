@@ -147,6 +147,7 @@ dim_W2 = 128
 dim_W3 = 64
 dim_F_I= 64
 time_dir = strftime("%Y-%m-%d-%H-%M-%S", localtime())
+print time_dir
 gen_disentangle_weight = args.gen_disentangle_weight
 gen_regularizer_weight = args.gen_regularizer_weight
 dis_regularizer_weight = args.dis_regularizer_weight
