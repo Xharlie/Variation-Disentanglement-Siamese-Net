@@ -411,16 +411,11 @@ class VDSN_FACE(object):
         # Fully connected layer 320 to 512 features
         with tf.name_scope('encoder_fc'):
             h_pool_flat = tf.reshape(h_pool, [-1, self.dim_53_fltr])
-<<<<<<< HEAD
-            h_fc = lrelu(batchnormalize(tf.matmul(h_pool_flat, self.encoder_WFC) + self.encoder_bFC))
-
-        F_I, F_V = tf.split(h_fc, [self.dim_F_I, self.dim_F_V], axis = 1)
-        return batchnormalize(F_I), batchnormalize(F_V)
-=======
             h_fc = lrelu(batchnormalize(tf.matmul(h_pool_flat, self.encoder_WFC) + self.encoder_bFC,
-                'en_hfc', train=self.is_training, reuse=reuse))
-        return h_fc
->>>>>>> refs/remotes/origin/master
+                        'en_hfc', train=self.is_training, reuse=reuse))
+        F_I, F_V = tf.split(h_fc, [self.dim_F_I, self.dim_F_V], axis = 1)
+        return batchnormalize(F_I, 'en_bn3', train=self.is_training, reuse=reuse), \
+               batchnormalize(F_V, 'en_bn4', train=self.is_training, reuse=reuse)
 
     def discriminator(self, F_V, reuse=True):
         # 512 to 512
