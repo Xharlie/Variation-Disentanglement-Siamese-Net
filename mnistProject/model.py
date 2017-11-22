@@ -17,7 +17,7 @@ class VDSN(object):
             dim_F_I=64,
             disentangle_obj_func = 'hybrid'
             ):
-
+        self.is_training = True
         self.batch_size = batch_size
         self.image_shape = image_shape
         self.dim_y = dim_y
@@ -73,20 +73,20 @@ class VDSN(object):
         image_real_right = tf.placeholder(tf.float32, [None] + self.image_shape)
         #  F_V for variance representation
         #  F_I for identity representation
-        F_I_left, F_V_left = self.encoder(image_real_left)
-        F_I_right, F_V_right = self.encoder(image_real_right)
+        F_I_left, F_V_left = self.encoder(image_real_left, reuse=False)
+        F_I_right, F_V_right = self.encoder(image_real_right, reuse=True)
 
-        h3_right = self.generator(F_I_left, F_V_right)
-        h3_left = self.generator(F_I_right, F_V_left)
+        h3_right = self.generator(F_I_left, F_V_right, reuse=False)
+        h3_left = self.generator(F_I_right, F_V_left, reuse=True)
 
         image_gen_left = tf.nn.sigmoid(h3_left)
         image_gen_right = tf.nn.sigmoid(h3_right)
 
-        Y_dis_logits_left = self.discriminator(F_V_left)
-        Y_dis_logits_right = self.discriminator(F_V_right)
+        Y_dis_logits_left = self.discriminator(F_V_left, reuse=False)
+        Y_dis_logits_right = self.discriminator(F_V_right, reuse=True)
 
-        Y_cla_logits_left = self.classifier(F_I_left)
-        Y_cla_logits_right = self.classifier(F_I_right)
+        Y_cla_logits_left = self.classifier(F_I_left, reuse=False)
+        Y_cla_logits_right = self.classifier(F_I_right, reuse=True)
 
         Y_dis_result_left = tf.reduce_sum(Y_left * tf.nn.softmax(Y_dis_logits_left), axis=1)
         Y_dis_result_right = tf.reduce_sum(Y_right * tf.nn.softmax(Y_dis_logits_right), axis=1)
@@ -146,18 +146,18 @@ class VDSN(object):
         #### GAN LOSS
         Y_real_right = tf.concat(axis=1, values=(Y_right, tf.zeros([tf.shape(Y_right)[0], 1])))
         Y_real_left = tf.concat(axis=1, values=(Y_left, tf.zeros([tf.shape(Y_left)[0], 1])))
-        gan_gen_cost = (self.GAN_discriminator(image_gen_left, Y_real_right)
-                        + self.GAN_discriminator(image_gen_right, Y_real_left))/2
+        gan_gen_cost = (self.GAN_discriminator(image_gen_left, Y_real_right, reuse=False)
+                        + self.GAN_discriminator(image_gen_right, Y_real_left, reuse=True))/2
 
         Y_fake_left = tf.concat(axis=1, values=(tf.zeros([tf.shape(Y_right)[0], self.dim_y]),
                                                 tf.ones([tf.shape(Y_right)[0], 1])))
         Y_fake_right = tf.concat(axis=1, values=(tf.zeros([tf.shape(Y_left)[0], self.dim_y]),
                                                  tf.ones([tf.shape(Y_left)[0], 1])))
 
-        gan_dis_cost_gen = (self.GAN_discriminator(image_gen_left, Y_fake_left)
-                                + self.GAN_discriminator(image_gen_right, Y_fake_right)) / 2
-        gan_dis_cost_real = (self.GAN_discriminator(image_real_left, Y_real_left)
-                            + self.GAN_discriminator(image_real_right, Y_real_right)) / 2
+        gan_dis_cost_gen = (self.GAN_discriminator(image_gen_left, Y_fake_left, reuse=True)
+                                + self.GAN_discriminator(image_gen_right, Y_fake_right, reuse=True)) / 2
+        gan_dis_cost_real = (self.GAN_discriminator(image_real_left, Y_real_left, reuse=True)
+                            + self.GAN_discriminator(image_real_right, Y_real_right, reuse=True)) / 2
         gan_dis_cost = gan_dis_cost_real + gan_dis_cost_gen \
                        + gen_regularizer_weight * gan_dis_regularization_loss
 
@@ -185,7 +185,7 @@ class VDSN(object):
                dis_prediction_left, dis_prediction_right, gen_cla_accuracy, F_I_left, F_V_left, \
                gan_gen_cost, gan_dis_cost, gan_total_cost
 
-    def GAN_discriminator(self, image, Y):
+    def GAN_discriminator(self, image, Y, reuse=False):
         # First convolutional layer - maps one grayscale image to 64 feature maps.
         with tf.name_scope('gan_dis_conv1'):
             h_conv1 = lrelu(
@@ -197,7 +197,7 @@ class VDSN(object):
         # Second convolutional layer -- maps 64 feature maps to 128.
         with tf.name_scope('gan_dis_conv2'):
             h_conv2 = tf.nn.conv2d(h_pool1, self.gan_dis_W2, strides=[1, 1, 1, 1], padding='SAME') + self.gan_dis_b2
-            h_conv2 = lrelu(batchnormalize(h_conv2))
+            h_conv2 = lrelu(batchnormalize(h_conv2,'gan_dis_bn1', train=self.is_training, reuse=reuse))
 
         # Second pooling layer.
         with tf.name_scope('gan_dis_pool2'):
@@ -207,7 +207,8 @@ class VDSN(object):
         # is down to 7x7x64 feature maps -- maps this to 1024 features.
         with tf.name_scope('gan_dis_fc1'):
             h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
-            h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.gan_dis_W3) + self.gan_dis_b3))
+            h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.gan_dis_W3) + self.gan_dis_b3,
+                                         'gan_dis_bn2', train=self.is_training, reuse=reuse))
 
         with tf.name_scope('gan_dis_fc2'):
             h_fc2 = tf.matmul(h_fc1, self.gan_dis_W4) + self.gan_dis_b4
@@ -227,7 +228,7 @@ class VDSN(object):
         return (minus_one_loss + negative_log_loss) / 2
 
 
-    def encoder(self, image):
+    def encoder(self, image, reuse=False):
 
         # First convolutional layer - maps one grayscale image to 64 feature maps.
         with tf.name_scope('encoder_conv1'):
@@ -239,7 +240,7 @@ class VDSN(object):
         # Second convolutional layer -- maps 64 feature maps to 128.
         with tf.name_scope('encoder_conv2'):
             h_conv2 = tf.nn.conv2d(h_pool1, self.encoder_W2, strides=[1, 1, 1, 1], padding='SAME')+self.encoder_b2
-            h_conv2 = lrelu(batchnormalize(h_conv2))
+            h_conv2 = lrelu(batchnormalize(h_conv2, 'en_bn1', train=self.is_training, reuse=reuse))
 
         # Second pooling layer.
         with tf.name_scope('encoder_pool2'):
@@ -250,34 +251,37 @@ class VDSN(object):
 
         with tf.name_scope('encoder_fc1'):
             h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
-            h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.encoder_W3) + self.encoder_b3))
+            h_fc1 = lrelu(batchnormalize(tf.matmul(
+                h_pool2_flat, self.encoder_W3) + self.encoder_b3, 'en_bn2', train=self.is_training, reuse=reuse))
 
         F_I, F_V = tf.split(h_fc1, [self.dim_F_I, self.dim_W1 - self.dim_F_I], axis=1)
-        return batchnormalize(F_I), batchnormalize(F_V)
+        return batchnormalize(F_I, 'en_bn3', train=self.is_training, reuse=reuse), batchnormalize(F_V,'en_bn4', train=self.is_training, reuse=reuse)
 
-    def discriminator(self, F_V):
+    def discriminator(self, F_V, reuse=False):
         # 512 to 512
-        h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
+        h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1,'dis_bn1', train=self.is_training, reuse=reuse))
             # 512 to 10
         h2 = tf.matmul(h1, self.discrim_W2) + self.discrim_b2
         return h2
 
-    def generator(self, F_I, F_V):
+    def generator(self, F_I, F_V, reuse=False):
         # F_combine 1*128
         F_combine = tf.concat(axis=1, values=[F_I, F_V])
         # h1 1* dim_W2*7*7
-        h1 = lrelu(batchnormalize(tf.add(tf.matmul(F_combine, self.gen_W1),self.gen_b1)))
+        h1 = lrelu(batchnormalize(tf.add(tf.matmul(F_combine, self.gen_W1),self.gen_b1),'gen_bn1', train=self.is_training, reuse=reuse))
         # h1 7*7*dim_W2
         h1 = tf.reshape(h1, [-1,7,7,self.dim_W2])
         output_shape_l3 = [tf.shape(h1)[0],14,14,self.dim_W3]
         # h2 14*14*dim_W3
         h2 = tf.nn.conv2d_transpose(h1, self.gen_W2, output_shape=output_shape_l3, strides=[1,2,2,1])
-        h2 = lrelu(batchnormalize(tf.add(h2,self.gen_b2)))
+        h2 = lrelu(batchnormalize(tf.add(h2,self.gen_b2),'gen_bn2', train=self.is_training, reuse=reuse))
         output_shape_l4 = [tf.shape(h2)[0],28,28,self.image_shape[-1]]
         # h3 28*28*3
         h3 = tf.add(tf.nn.conv2d_transpose(
             h2, self.gen_W3, output_shape=output_shape_l4, strides=[1,2,2,1]), self.gen_b3)
         return h3
 
-    def classifier(self, F_I):
+    def classifier(self, F_I, reuse=False):
         return tf.matmul(F_I, self.classifier_W1) + self.classifier_b1
+
+

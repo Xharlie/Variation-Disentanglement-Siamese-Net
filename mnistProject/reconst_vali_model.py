@@ -49,25 +49,31 @@ class reconst_validation_model(model.VDSN):
             # F_I_left, F_V_left = tf.split(h_fc1_left, num_or_size_splits=2, axis=1)
             # F_I_right, F_V_right = tf.split(h_fc1_right, num_or_size_splits=2, axis=1)
 
-            F_I_left, F_V_left = self.encoder(image_real_left)
-            F_I_right, F_V_right = self.encoder(image_real_right)
+            F_I_left, F_V_left = self.encoder(image_real_left, reuse=False)
+            F_I_right, F_V_right = self.encoder(image_real_right, reuse=True)
 
-            h4_validation = self.generator(F_I_left, F_V_right)
+            h4_validation = self.generator(F_I_left, F_V_right, reuse=False)
             image_F_I = image_real_left
             image_F_V = image_real_right
             image_generated = tf.nn.sigmoid(h4_validation)
         else:
-            F_I_left, F_V_left = self.encoder(image_real_left)
-            h4_validation = self.generator(F_I_left, center_representation)
+            F_I_left, F_V_left = self.encoder(image_real_left, reuse=False)
+            h4_validation = self.generator(F_I_left, center_representation, reuse=False)
             image_F_I = image_real_left
             image_F_V = tf.nn.sigmoid(self.generator(
-                tf.zeros_like(F_I_left), center_representation))
+                tf.zeros_like(F_I_left), center_representation, reuse=True))
             image_generated = tf.nn.sigmoid(h4_validation)
         return Y, center_representation, image_real_left, \
-               image_real_right, image_F_I, image_F_V, image_generated
+               image_real_right, image_F_I, image_F_V, image_generated, F_I_left, F_V_left
+
+    def feature_2_img(self):
+        F_I = tf.placeholder(tf.float32, [None, self.dim_F_I])
+        F_V = tf.placeholder(tf.float32, [None, self.dim_W1 - self.dim_F_I])
+        h3 = self.generator(F_I, F_V, reuse=False)
+        image_gen = tf.nn.sigmoid(h3)
+        return F_I, F_V, image_gen
 
     def build_class_center(self):
-
         Y = tf.placeholder(tf.float32, [None])
         image_real = tf.placeholder(tf.float32, [None] + self.image_shape)
         h_fc1 = self.encoder(image_real)

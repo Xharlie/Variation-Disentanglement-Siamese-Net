@@ -29,7 +29,7 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY):
         dim_W3=conf["dim_W3"],
         dim_F_I=conf["dim_F_I"]
     )
-
+    F_validation.is_training = False
     Y_tf, image_real_tf, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob_tf,accuracy_tf \
         = F_validation_model.build_model(feature_selection= conf["feature_selection"],
                                            dis_regularizer_weight=conf["dis_regularizer_weight"])

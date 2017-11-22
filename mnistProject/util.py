@@ -58,6 +58,18 @@ def save_visualization_triplet(X_I, X_V, X, nh_nw, save_path='./vis_triple/sampl
         img[j*h:j*h+h, (3*i)*w:(3*i+1)*w, :] = X_I[n]
         img[j*h:j*h+h, (3*i+1)*w:(3*i+2)*w, :] = X_V[n]
         img[j*h:j*h+h, (3*i+2)*w:(3*i+3)*w, :] = X[n]
+    draw_frame(img, 1)
+    scipy.misc.imsave(save_path, img)
+
+def save_visualization_interpolation(img_matrix, save_path='./vis_triple/sample.jpg'):
+    rows,columns = len(img_matrix), len(img_matrix[0])
+    per_cell_size = img_matrix[0][0].shape[0]
+    # print rows,columns,per_cell_size
+    img = np.zeros((rows * per_cell_size, columns * per_cell_size, 3))
+    for r in range(rows):
+        for c in range(columns):
+            img[r*per_cell_size:(r+1)*per_cell_size,
+            c*per_cell_size:(c+1)*per_cell_size, :] = img_matrix[r][c]
     scipy.misc.imsave(save_path, img)
 
 def check_create_dir(dir):
@@ -88,3 +100,18 @@ def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10)
                 Y_right.append(index)
                 break
     return trX[randomList], np.asarray(Y_right)
+
+def sort_by_identity(teX, teY):
+    indexTable = [[] for i in range(10)]
+    sort_index = []
+    for index in range(len(teY)):
+        indexTable[teY[index]].append(index)
+    for i in range(len(indexTable)):
+        for j in range(len(indexTable[i])):
+            sort_index.append(indexTable[i][j])
+    return teX[sort_index], teY[sort_index]
+
+def draw_frame(img, channel):
+    for i in range(img.shape[1] / 3):
+        img[i*3:i*3 + 2, :, channel] = 255
+    return img

@@ -332,6 +332,7 @@ with tf.Session(config=config) as sess:
 
                 if np.mod(iterations, drawing_step) == 0:
                     image_real_left, image_real_right, _, _ = web_face_load(directory_list, visualize_dim)
+                    VDSN_model.is_training = False
                     generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                             [image_gen_left, F_V_left_tf, F_I_left_tf],
                             feed_dict={
@@ -343,6 +344,7 @@ with tf.Session(config=config) as sess:
                                        (int(math.ceil(batch_size ** (.5))),
                                         int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
                                        save_path=args.pic_dir_parent + 'sample_%04d.jpg' % int(iterations))
+                    VDSN_model.is_training = True
                 iterations += 1
 
         # Save the variables to disk.

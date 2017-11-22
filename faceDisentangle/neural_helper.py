@@ -21,31 +21,11 @@ def avg_pool_6x6(x):
     return tf.nn.avg_pool(x, ksize=[1, 6, 6, 1],
                           strides=[1, 1, 1, 1], padding='VALID')
 
-def batchnormalize(X, eps=1e-8, g=None, b=None):
-    if X.get_shape().ndims == 4:
-        mean = tf.reduce_mean(X, [0,1,2])
-        std = tf.reduce_mean( tf.square(X-mean), [0,1,2] )
-        X = (X-mean) / tf.sqrt(std+eps)
 
-        if g is not None and b is not None:
-            g = tf.reshape(g, [1,1,1,-1])
-            b = tf.reshape(b, [1,1,1,-1])
-            X = X*g + b
+def batchnormalize(inputs, name, train=True, reuse=False):
+  return tf.contrib.layers.batch_norm(inputs=inputs,is_training=train,
+                                      reuse=reuse,scope=name,scale=True)
 
-    elif X.get_shape().ndims == 2:
-        mean = tf.reduce_mean(X, 0)
-        std = tf.reduce_mean(tf.square(X-mean), 0)
-        X = (X-mean) / tf.sqrt(std+eps)
-
-        if g is not None and b is not None:
-            g = tf.reshape(g, [1,-1])
-            b = tf.reshape(b, [1,-1])
-            X = X*g + b
-
-    else:
-        raise NotImplementedError
-
-    return X
 
 def lrelu(X, leak=0.2):
     f1 = 0.5 * (1 + leak)
