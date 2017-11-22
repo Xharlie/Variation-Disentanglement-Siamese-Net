@@ -21,6 +21,9 @@ parser.add_argument("--gen_start_learning_rate", nargs='?', type=float, default=
 parser.add_argument("--dis_start_learning_rate", nargs='?', type=float, default=0.002,
                     help="learning rate")
 
+parser.add_argument("--gan_start_learning_rate", nargs='?', type=float, default=0.002,
+                    help="learning rate")
+
 parser.add_argument("--gen_decay_step", nargs='?', type=int, default=10000,
                     help="generator decay step")
 
@@ -32,6 +35,12 @@ parser.add_argument("--gen_decay_rate", nargs='?', type=float, default=0.80,
 
 parser.add_argument("--dis_decay_rate", nargs='?', type=float, default=1.00,
                     help="discriminator decay rate")
+
+parser.add_argument("--gan_decay_rate", nargs='?', type=float, default=1.00,
+                    help="GAN discriminator decay rate")
+
+parser.add_argument("--gan_decay_step", nargs='?', type=float, default=10000,
+                    help="GAN decay step")
 
 parser.add_argument("--batch_size", nargs='?', type=int, default=128,
                     help="batch_size")
@@ -60,6 +69,9 @@ parser.add_argument("--gen_series", nargs='?', type=int, default=10,
 
 parser.add_argument("--dis_series", nargs='?', type=int, default=100,
                     help="how many time the dis can train consecutively")
+
+parser.add_argument("--gan_series", nargs='?', type=int, default=1,
+                    help="how many time the generator with gan task can train consecutively")
 
 parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
                     help="how many steps to draw a comparision pic")
@@ -136,8 +148,13 @@ n_epochs = args.n_epochs
 
 batch_size = args.batch_size
 image_shape = [96, 96, 3]
+
+file_path = "../data/image_sample/*"
+directory_list = glob.glob(file_path)
+
+dim_y = len(directory_list)
+
 # amount of class label
-dim_y=10
 dim_11_fltr=32
 dim_12_fltr=64
 dim_21_fltr=64
@@ -172,11 +189,6 @@ model_dir = check_create_dir(args.model_dir_parent + time_dir + '/')
 visualize_dim = batch_size
 drawing_step = args.drawing_step
 
-file_path = "../data/image_sample/*"
-directory_list = glob.glob(file_path)
-
-dim_y = len(directory_list)
-
 VDSN_model = VDSN_FACE(
                 batch_size=batch_size,
                 image_shape=image_shape,
@@ -197,16 +209,13 @@ VDSN_model = VDSN_FACE(
                 dim_53_fltr=dim_53_fltr,
                 dim_FC=dim_FC,
                 dim_F_I=dim_F_I,
-                simple_discriminator=args.simple_discriminator,
-                simple_generator=args.simple_generator,
-                simple_classifier=args.simple_classifier,
                 disentangle_obj_func='hybrid'
                 )
 
 Y_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
     gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
     image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf, \
-    F_I_left_tf, F_V_left_tf,\
+    F_I_left_tf, F_V_left_tf, gan_gen_cost_tf, gan_dis_cost_tf, gan_total_cost_tf\
     = VDSN_model.build_model(
     gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
 
@@ -218,10 +227,13 @@ gen_learning_rate = tf.train.exponential_decay(args.gen_start_learning_rate, glo
                                                args.gen_decay_step, args.gen_decay_rate, staircase=True)
 dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, global_step,
                                                args.dis_decay_step, args.dis_decay_rate, staircase=True)
+gan_learning_rate = tf.train.exponential_decay(args.gan_start_learning_rate, global_step,
+                                               args.gan_decay_step, args.gan_decay_rate, staircase=True)
 
 dis_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
 gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
 cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
+gan_dis_vars = filter(lambda x: x.name.startswith('gan'), tf.trainable_variables())
 
 # include en_* and encoder_* W and b,
 encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
@@ -233,10 +245,20 @@ train_op_gen = tf.train.AdamOptimizer(
 train_op_discrim = tf.train.AdamOptimizer(
     dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
 
+train_op_gan_gen = tf.train.AdamOptimizer(
+    dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
+
+train_op_gan_discrim = tf.train.AdamOptimizer(
+    gan_learning_rate, beta1=0.5).minimize(
+    gan_dis_cost_tf, var_list=gan_dis_vars)
+
 iterations = 0
 save_path=""
 
-with tf.Session(config=tf.ConfigProto()) as sess:
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+
+with tf.Session(config=config) as sess:
     try:
         sess.run(tf.global_variables_initializer())
         # writer for tensorboard summary
@@ -246,8 +268,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
 
         if (len(args.pretrain_model)>0):
             # Create a saver. include gen_vars and encoder_vars
-            pretrain_saver = tf.train.Saver()
-            pretrain_saver.restore(sess, args.pretrain_model)
+            saver.restore(sess, args.pretrain_model)
         elif (len(args.pretrain_model_wo_lr)>0):
             # Create a saver. include gen_vars and encoder_vars
             pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
@@ -260,7 +281,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
                 # Ys = OneHot(trY[start:end],10)
                 #
                 # Xs_right = randomPickRight(start, end, trX, trY, indexTable).reshape( [-1, 28, 28, 1])
-                left_images, right_images, labels = web_face_load(directory_list, batch_size)
+                left_images, right_images, labels, _ = web_face_load(directory_list, batch_size)
                 labels = OneHot(directory_list, len(directory_list))
 
                 left_images = left_images.reshape((-1, 96, 96, 3))
@@ -310,7 +331,7 @@ with tf.Session(config=tf.ConfigProto()) as sess:
 
 
                 if np.mod(iterations, drawing_step) == 0:
-                    image_real_left, image_real_right, _ = web_face_load(directory_list, visualize_dim)
+                    image_real_left, image_real_right, _, _ = web_face_load(directory_list, visualize_dim)
                     generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                             [image_gen_left, F_V_left_tf, F_I_left_tf],
                             feed_dict={
