@@ -71,4 +71,4 @@ def crop2Target(image):
 # Only for Unitest
 # '''
 # if __name__ == "__main__":
-#     web_face_load("../data/image_sample", 200)
+#     web_face_load("../data/image_sample", 1)

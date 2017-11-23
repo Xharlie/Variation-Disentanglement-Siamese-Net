@@ -116,8 +116,8 @@ class VDSN_FACE(object):
         # Weight of discriminator:
         self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
         self.discrim_b1 = bias_variable([self.dim_F_V], name='dis_b1')
-        self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_y], stddev=0.02), name='discrim_W2')
-        self.discrim_b1 = bias_variable([self.dim_y], name='dis_b2')
+        self.discrim_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_y], stddev=0.02), name='discrim_W2')
+        self.discrim_b2 = bias_variable([self.dim_y], name='dis_b2')
 
         # GAN parameters:
         self.gan_discrim_W11 = tf.Variable(tf.random_normal([3, 3, image_shape[-1], dim_11_fltr], stddev=0.02), name='gan_discrim_W11')
@@ -136,22 +136,22 @@ class VDSN_FACE(object):
         self.gan_discrim_W53 = tf.Variable(tf.random_normal([3, 3, dim_52_fltr, dim_53_fltr], stddev=0.02), name='gan_discrim_W53')
         self.gan_discrim_WFC = tf.Variable(tf.random_normal([dim_53_fltr, dim_FC], stddev=0.02), name='gan_discrim_WFC')
         self.gan_discrim_WFC1 = tf.Variable(tf.random_normal([dim_FC, dim_y+1], stddev=0.02), name='gan_discrim_WFC1')
-        self.gan_discrim_b11 = bias_variable([dim_11_fltr], name='gan_discrim_b11')
-        self.gan_discrim_b12 = bias_variable([dim_12_fltr], name='gan_discrim_b12')
-        self.gan_discrim_b21 = bias_variable([dim_21_fltr], name='gan_discrim_b21')
-        self.gan_discrim_b22 = bias_variable([dim_22_fltr], name='gan_discrim_b22')
-        self.gan_discrim_b23 = bias_variable([dim_23_fltr], name='gan_discrim_b23')
-        self.gan_discrim_b31 = bias_variable([dim_31_fltr], name='gan_discrim_b31')
-        self.gan_discrim_b32 = bias_variable([dim_32_fltr], name='gan_discrim_b32')
-        self.gan_discrim_b33 = bias_variable([dim_33_fltr], name='gan_discrim_b33')
-        self.gan_discrim_b41 = bias_variable([dim_41_fltr], name='gan_discrim_b41')
-        self.gan_discrim_b42 = bias_variable([dim_42_fltr], name='gan_discrim_b42')
-        self.gan_discrim_b43 = bias_variable([dim_43_fltr], name='gan_discrim_b43')
-        self.gan_discrim_b51 = bias_variable([dim_51_fltr], name='gan_discrim_b51')
-        self.gan_discrim_b52 = bias_variable([dim_52_fltr], name='gan_discrim_b52')
-        self.gan_discrim_b53 = bias_variable([dim_53_fltr], name='gan_discrim_b53')
-        self.gan_discrim_bFC = bias_variable([dim_FC], name='gan_discrim_bFC')
-        self.gan_discrim_bFC1 = bias_variable([dim_y+1], name='gan_discrim_bFC1')
+        self.gan_discrim_b11 = bias_variable([dim_11_fltr], name='gan_dis_b11')
+        self.gan_discrim_b12 = bias_variable([dim_12_fltr], name='gan_dis_b12')
+        self.gan_discrim_b21 = bias_variable([dim_21_fltr], name='gan_dis_b21')
+        self.gan_discrim_b22 = bias_variable([dim_22_fltr], name='gan_dis_b22')
+        self.gan_discrim_b23 = bias_variable([dim_23_fltr], name='gan_dis_b23')
+        self.gan_discrim_b31 = bias_variable([dim_31_fltr], name='gan_dis_b31')
+        self.gan_discrim_b32 = bias_variable([dim_32_fltr], name='gan_dis_b32')
+        self.gan_discrim_b33 = bias_variable([dim_33_fltr], name='gan_dis_b33')
+        self.gan_discrim_b41 = bias_variable([dim_41_fltr], name='gan_dis_b41')
+        self.gan_discrim_b42 = bias_variable([dim_42_fltr], name='gan_dis_b42')
+        self.gan_discrim_b43 = bias_variable([dim_43_fltr], name='gan_dis_b43')
+        self.gan_discrim_b51 = bias_variable([dim_51_fltr], name='gan_dis_b51')
+        self.gan_discrim_b52 = bias_variable([dim_52_fltr], name='gan_dis_b52')
+        self.gan_discrim_b53 = bias_variable([dim_53_fltr], name='gan_dis_b53')
+        self.gan_discrim_bFC = bias_variable([dim_FC], name='gan_dis_bFC')
+        self.gan_discrim_bFC1 = bias_variable([dim_y+1], name='gan_dis_bFC1')
 
     def build_model(self, gen_disentangle_weight=1, gen_regularizer_weight=1,
                     dis_regularizer_weight=1, gen_cla_weight=1):
@@ -194,11 +194,11 @@ class VDSN_FACE(object):
         gen_cla_correct_prediction_right = tf.equal(tf.argmax(Y_cla_logits_right, 1), tf.argmax(Y_right, 1))
         gen_cla_accuracy_right = tf.reduce_mean(tf.cast(gen_cla_correct_prediction_right, tf.float32))
 
-        gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
+        gen_vars = filter(lambda x: x.name.startswith('generator'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
         discriminator_vars = filter(lambda x: x.name.startswith('discrim'), tf.trainable_variables())
         classifier_vars = filter(lambda x: x.name.startswith('classif'), tf.trainable_variables())
-        gan_discriminators_vars = filter(lambda: x.name.startswith('gan_discrim'), tf.trainable_variables())
+        gan_discriminators_vars = filter(lambda x: x.name.startswith('gan_discrim'), tf.trainable_variables())
 
         regularizer = tf.contrib.layers.l2_regularizer(0.1)
         gen_regularization_loss = tf.contrib.layers.apply_regularization(
@@ -271,7 +271,7 @@ class VDSN_FACE(object):
         tf.summary.scalar('gan_gen_cost', gan_gen_cost)
         tf.summary.scalar('gan_total_cost', gan_total_cost)
 
-        return Y, image_real_left, image_real_right, gen_recon_cost, gen_disentangle_cost, \
+        return Y_left, Y_right, image_real_left, image_real_right, gen_recon_cost, gen_disentangle_cost, \
                gen_cla_cost, gen_total_cost, \
                dis_cost_tf, dis_total_cost_tf, image_gen_left, image_gen_right, \
                dis_prediction_left, dis_prediction_right, gen_cla_accuracy, F_I_left, F_V_left, \
@@ -280,46 +280,60 @@ class VDSN_FACE(object):
     def GAN_discriminiator(self, image, Y, reuse=False):
         with tf.name_scope('gan_discrim_conv11'):
             h_conv11 = lrelu(batchnormalize(
-                tf.nn.conv2d(image, self.gan_discrim_W11, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b11))
+                tf.nn.conv2d(image, self.gan_discrim_W11, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b11))
+                            ,'gan_dis_bn11', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv12'):
             h_conv12 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv11, self.gan_discrim_W12, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b12))
+                tf.nn.conv2d(h_conv11, self.gan_discrim_W12, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b12))
+                            ,'gan_dis_bn12', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv21'):
             h_conv21 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv12, self.gan_discrim_W21, strides=[1, 2, 2, 1], padding='SAME') + self.gan_discrim_b21))
+                tf.nn.conv2d(h_conv12, self.gan_discrim_W21, strides=[1, 2, 2, 1], padding='SAME') # + self.gan_discrim_b21))
+                            ,'gan_dis_bn21', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv22'):
             h_conv22 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv21, self.gan_discrim_W22, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b22))
+                tf.nn.conv2d(h_conv21, self.gan_discrim_W22, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b22))
+                            ,'gan_dis_b22', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv23'):
             h_conv23 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv22, self.gan_discrim_W23, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b23))
+                tf.nn.conv2d(h_conv22, self.gan_discrim_W23, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b23))
+                            ,'gan_dis_b23', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv31'):
             h_conv31 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv23, self.gan_discrim_W31, strides=[1, 2, 2, 1], padding='SAME') + self.gan_discrim_b31))
+                tf.nn.conv2d(h_conv23, self.gan_discrim_W31, strides=[1, 2, 2, 1], padding='SAME') # + self.gan_discrim_b31))
+                            ,'gan_dis_bn31', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv32'):
             h_conv32 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv31, self.gan_discrim_W32, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b32))
+                tf.nn.conv2d(h_conv31, self.gan_discrim_W32, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b32))
+                            ,'gan_dis_bn32', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv33'):
             h_conv33 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv32, self.gan_discrim_W33, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b33))
+                tf.nn.conv2d(h_conv32, self.gan_discrim_W33, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b33))
+                            , 'gan_dis_bn33', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv41'):
             h_conv41 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv33, self.gan_discrim_W41, strides=[1, 2, 2, 1], padding='SAME') + self.gan_discrim_b41))
+                tf.nn.conv2d(h_conv33, self.gan_discrim_W41, strides=[1, 2, 2, 1], padding='SAME') # + self.gan_discrim_b41))
+                            ,'gan_dis_bn41', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv42'):
             h_conv42 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv41, self.gan_discrim_W42, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b42))
+                tf.nn.conv2d(h_conv41, self.gan_discrim_W42, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b42))
+                            ,'gan_dis_bn42', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv43'):
             h_conv43 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv42, self.gan_discrim_W43, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b43))
+                tf.nn.conv2d(h_conv42, self.gan_discrim_W43, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b43))
+                            ,'gan_dis_bn43', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv51'):
             h_conv51 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv43, self.gan_discrim_W51, strides=[1, 2, 2, 1], padding='SAME') + self.gan_discrim_b51))
+                tf.nn.conv2d(h_conv43, self.gan_discrim_W51, strides=[1, 2, 2, 1], padding='SAME') # + self.gan_discrim_b51))
+                            ,'gan_dis_bn51', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv52'):
             h_conv52 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv51, self.gan_discrim_W52, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b52))
+                tf.nn.conv2d(h_conv51, self.gan_discrim_W52, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b52))
+                            ,'gan_dis_bn52', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_discrim_conv53'):
             h_conv53 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv52, self.gan_discrim_W53, strides=[1, 1, 1, 1], padding='SAME') + self.gan_discrim_b53))
+                tf.nn.conv2d(h_conv52, self.gan_discrim_W53, strides=[1, 1, 1, 1], padding='SAME') # + self.gan_discrim_b53))
+                            ,'gan_dis_bm53', train=self.is_training, reuse=reuse))
 
         # ave pooling layer.
         with tf.name_scope('gan_discrim_avg_pool'):
@@ -351,67 +365,67 @@ class VDSN_FACE(object):
         # First convolutional layer - maps one grayscale image to 64 feature maps.
         with tf.name_scope('encoder_conv11'):
             h_conv11 = lrelu(batchnormalize(
-                tf.nn.conv2d(image, self.encoder_W11, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b11,
-                'en_bn11', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(image, self.encoder_W11, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b11,
+                            ,'en_bn11', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv12'):
             h_conv12 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv11, self.encoder_W12, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b12,
-                'en_bn12', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv11, self.encoder_W12, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b12,
+                            ,'en_bn12', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv21'):
             h_conv21 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv12, self.encoder_W21, strides=[1, 2, 2, 1], padding='SAME') + self.encoder_b21,
-                'en_bn21', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv12, self.encoder_W21, strides=[1, 2, 2, 1], padding='SAME') # + self.encoder_b21,
+                            ,'en_bn21', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv22'):
             h_conv22 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv21, self.encoder_W22, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b22,
-                'en_bn22', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv21, self.encoder_W22, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b22,
+                            ,'en_bn22', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv23'):
             h_conv23 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv22, self.encoder_W23, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b23,
-                'en_bn23', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv22, self.encoder_W23, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b23,
+                            ,'en_bn23', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv31'):
             h_conv31 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv23, self.encoder_W31, strides=[1, 2, 2, 1], padding='SAME') + self.encoder_b31,
-                'en_bn31', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv23, self.encoder_W31, strides=[1, 2, 2, 1], padding='SAME') # + self.encoder_b31,
+                            ,'en_bn31', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv32'):
             h_conv32 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv31, self.encoder_W32, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b32,
-                'en_bn32', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv31, self.encoder_W32, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b32,
+                            ,'en_bn32', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv33'):
             h_conv33 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv32, self.encoder_W33, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b33,
-                'en_bn33', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv32, self.encoder_W33, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b33,
+                            ,'en_bn33', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv41'):
             h_conv41 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv33, self.encoder_W41, strides=[1, 2, 2, 1], padding='SAME') + self.encoder_b41,
-                'en_bn41', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv33, self.encoder_W41, strides=[1, 2, 2, 1], padding='SAME') # + self.encoder_b41,
+                            ,'en_bn41', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv42'):
             h_conv42 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv41, self.encoder_W42, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b42,
-                'en_bn42', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv41, self.encoder_W42, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b42,
+                            ,'en_bn42', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv43'):
             h_conv43 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv42, self.encoder_W43, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b43,
-                'en_bn43', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv42, self.encoder_W43, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b43,
+                            ,'en_bn43', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv51'):
             h_conv51 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv43, self.encoder_W51, strides=[1, 2, 2, 1], padding='SAME') + self.encoder_b51,
-                'en_bn51', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv43, self.encoder_W51, strides=[1, 2, 2, 1], padding='SAME') # + self.encoder_b51,
+                            ,'en_bn51', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv52'):
             h_conv52 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv51, self.encoder_W52, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b52,
-                'en_bn52', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv51, self.encoder_W52, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b52,
+                            ,'en_bn52', train=self.is_training, reuse=reuse))
         with tf.name_scope('encoder_conv53'):
             h_conv53 = lrelu(batchnormalize(
-                tf.nn.conv2d(h_conv52, self.encoder_W53, strides=[1, 1, 1, 1], padding='SAME') + self.encoder_b53,
-                'en_bn53', train=self.is_training, reuse=reuse))
+                tf.nn.conv2d(h_conv52, self.encoder_W53, strides=[1, 1, 1, 1], padding='SAME') # + self.encoder_b53,
+                            ,'en_bn53', train=self.is_training, reuse=reuse))
         # ave pooling layer.
         with tf.name_scope('encoder_avg_pool'):
             h_pool= avg_pool_6x6(h_conv53)
         # Fully connected layer 320 to 512 features
         with tf.name_scope('encoder_fc'):
             h_pool_flat = tf.reshape(h_pool, [-1, self.dim_53_fltr])
-            h_fc = lrelu(batchnormalize(tf.matmul(h_pool_flat, self.encoder_WFC) + self.encoder_bFC,
+            h_fc = lrelu(batchnormalize(tf.matmul(h_pool_flat, self.encoder_WFC),
                         'en_hfc', train=self.is_training, reuse=reuse))
         F_I, F_V = tf.split(h_fc, [self.dim_F_I, self.dim_F_V], axis = 1)
         return batchnormalize(F_I, 'en_bn3', train=self.is_training, reuse=reuse), \
@@ -419,7 +433,7 @@ class VDSN_FACE(object):
 
     def discriminator(self, F_V, reuse=True):
         # 512 to 512
-        h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1) + self.discrim_b1))
+        h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1), 'dis_bn1', train=self.is_training, reuse=reuse))
         h2 = tf.matmul(h1, self.discrim_W2) + self.discrim_b2
         return h2
 
@@ -503,5 +517,5 @@ class VDSN_FACE(object):
         return h_11
 
 
-    def classifier(self, F_I):
+    def classifier(self, F_I, reuse=False):
         return tf.matmul(F_I, self.classifier_W1) + self.classifier_b1

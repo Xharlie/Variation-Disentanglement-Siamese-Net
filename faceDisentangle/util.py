@@ -2,6 +2,8 @@ import cv2
 import scipy.misc
 import numpy as np
 import os
+import os.path
+import glob
 
 def OneHot(X, n=None, negative_class=0.):
     X = np.asarray(X).flatten()
@@ -70,6 +72,7 @@ def check_create_dir(dir):
 
 def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10):
     randomList = []
+    Y_right = []
     for i in range(start, end):
         while True:
             if feature == "F_I_F_V":
@@ -84,5 +87,29 @@ def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10)
                 if index == trY[i]:
                     continue
                 randomList.append(np.random.choice(indexTable[index], 1)[0])
+                Y_right.append(index)
                 break
-    return trX[randomList]
+    return trX[randomList], np.asarray(Y_right)
+
+'''
+Randomly crop 125*125 image to 96*96
+Achieve the data augmentation meanwhile
+'''
+def crop2Target(image):
+    randomNumberX = np.random.randint(0, 28)
+    randomNumberY = np.random.randint(0, 28)
+    return image[randomNumberX:randomNumberX+96, randomNumberY:randomNumberY+96, :]
+
+def normalizaion(image):
+    return (image - 127.0) / 255.
+
+def CASIA_load(file_path):
+    dataSets = []
+    labelSet = []
+    label2int = 0
+    for file in glob.glob(file_path):
+        for image in glob.glob(file + '/*.jpg'):
+            dataSets.append(normalizaion(crop2Target(scipy.misc.imread(image))))
+            labelSet.append(label2int)
+        label2int += 1
+    return np.array(dataSets), np.array(labelSet)
