@@ -233,12 +233,12 @@ class VDSN(object):
         return (minus_one_loss + negative_log_loss) / 2 + entropy_loss / 10
 
     def entropy_calculation(self, p1, p2):
-        p1 = tf.ops.convert_to_tensor(p1)
-        p2 = tf.ops.convert_to_tensor(p2)
-        precise_p2 = tf.math_ops.cast(p2, tf.float32) if (
+        p1 = tf.convert_to_tensor(p1)
+        p2 = tf.convert_to_tensor(p2)
+        precise_p2 = tf.cast(p2, tf.float32) if (
             p2.dtype == tf.float16) else p2
         # labels and logits must be of the same type
-        p1 = tf.math_ops.cast(p1, precise_p2.dtype)
+        p1 = tf.cast(p1, precise_p2.dtype)
         return tf.reduce_mean(-tf.reduce_sum(p1 * tf.log(p2), reduction_indices=[1]))
 
     def encoder(self, image, reuse=False):
