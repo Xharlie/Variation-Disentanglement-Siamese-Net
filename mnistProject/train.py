@@ -113,6 +113,9 @@ parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
 parser.add_argument("--disentangle_obj_func", nargs='?', type=str, default='negative_log',
                     help="generator's disentanglement loss use which loss, negative_log, one_minus or hybrid")
 
+parser.add_argument("--debug", action="store_true",
+                    help="debug_mode")
+
 # >==================  F_V_validation args =======================<
 
 parser.add_argument("--F_V_validation_logs_dir_root", nargs='?', type=str, default='F_V_validation/',
@@ -297,8 +300,13 @@ with tf.Session(config=config) as sess:
                     print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
                     print("gen id classifier accuracy:", gen_cla_accuracy_val)
-                    # moving_mean = filter(lambda x: x.name.startswith('en_bn1/moving_mean'), tf.all_variables())[0]
-                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
+                    if args.debug:
+                        bn3_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn3/beta'), tf.all_variables())[0]
+                        bn3_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn3/gamma'), tf.all_variables())[0]
+                        bn4_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn4/beta'), tf.all_variables())[0]
+                        bn4_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn4/gamma'), tf.all_variables())[0]
+                        print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/"+str(sess.run(bn3_gamma)))
+                        print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/"+str(sess.run(bn4_gamma)))
                 elif modulus < args.recon_series + args.dis_series:
                     _, summary, dis_cost_val, dis_total_cost_val, \
                             dis_prediction_val_left, dis_prediction_val_right \
@@ -380,8 +388,13 @@ with tf.Session(config=config) as sess:
                     print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
                     print("gen id classifier accuracy:", gen_cla_accuracy_val)
-                    # moving_mean = filter(lambda x: x.name.startswith('en/moving_mean'), tf.all_variables())[0]
-                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
+                    if args.debug:
+                        bn3_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn3/beta'), tf.all_variables())[0]
+                        bn3_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn3/gamma'), tf.all_variables())[0]
+                        bn4_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn4/beta'), tf.all_variables())[0]
+                        bn4_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn4/gamma'), tf.all_variables())[0]
+                        print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/" + str(sess.run(bn3_gamma)))
+                        print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/" + str(sess.run(bn4_gamma)))
                 iterations += 1
 
         # Save the variables to disk.

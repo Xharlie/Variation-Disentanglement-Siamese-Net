@@ -255,7 +255,7 @@ class VDSN(object):
                                          ,'en_bn2', train=self.is_training, reuse=reuse))
 
         F_I, F_V = tf.split(h_fc1, [self.dim_F_I, self.dim_W1 - self.dim_F_I], axis=1)
-        return batchnormalize(F_I, 'en_bn3', train=self.is_training, reuse=reuse), batchnormalize(F_V,'en_bn4', train=self.is_training, reuse=reuse)
+        return batchnormalize(F_I, 'fix_scale_en_bn3', train=self.is_training, reuse=reuse), batchnormalize(F_V,'fix_scale_en_bn4', train=self.is_training, reuse=reuse)
 
     def discriminator(self, F_V, reuse=False):
         # 512 to 512
