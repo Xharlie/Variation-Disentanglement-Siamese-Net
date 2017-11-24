@@ -73,7 +73,7 @@ parser.add_argument("--dis_series", nargs='?', type=int, default=100,
 parser.add_argument("--gan_series", nargs='?', type=int, default=1,
                     help="how many time the generator with gan task can train consecutively")
 
-parser.add_argument("--drawing_step", nargs='?', type=int, default=200,
+parser.add_argument("--drawing_step", nargs='?', type=int, default=10000,
                     help="how many steps to draw a comparision pic")
 
 parser.add_argument("--gen_regularizer_weight", nargs='?', type=float, default=0.01,
@@ -113,7 +113,7 @@ parser.add_argument("--recon_series", nargs='?', type=int, default=1,
                     help="how many time the generator with reconstruction task can train consecutively")
 
 parser.add_argument("--disentangle_obj_func", nargs='?', type=str, default='negative_log',
-                    help="generator's disentanglement loss use which loss, negative_log, one_minus or hybrid")
+                    help="generator's disentanglement loss use which loss, negative_log, one_minus, hybrid or complex")
 
 # >==================  F_V_validation args =======================<
 
@@ -301,7 +301,6 @@ with tf.Session(config=config) as sess:
                     Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_D_F_V", dim=dim_y)
                     Ys_right = OneHot(Ys_right, dim_y)
                     Xs_right = Xs_right.reshape([-1, 96, 96, 3])
-		print Xs_left.shape
                 if modulus < args.recon_series:
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
                             dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \

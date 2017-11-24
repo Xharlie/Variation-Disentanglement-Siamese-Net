@@ -111,7 +111,7 @@ parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                     help="which gpu to use")
 
 parser.add_argument("--disentangle_obj_func", nargs='?', type=str, default='negative_log',
-                    help="generator's disentanglement loss use which loss, negative_log, one_minus or hybrid")
+                    help="generator's disentanglement loss use which loss, negative_log, one_minus, hybrid or complex")
 
 parser.add_argument("--debug", action="store_true",
                     help="debug_mode")
