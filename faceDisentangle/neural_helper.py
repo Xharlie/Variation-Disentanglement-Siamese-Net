@@ -21,7 +21,7 @@ def max_pool_2x2(x):
 def avg_pool_6x6(x):
     """max_pool_6x6 downsamples a feature map by 2X."""
     return tf.nn.avg_pool(x, ksize=[1, 6, 6, 1],
-                          strides=[1, 1, 1, 1], padding='SAME')
+                          strides=[1, 1, 1, 1], padding='VALID')
 
 # def batchnormalize(inputs, name, train=True, reuse=False):
 #   return tf.contrib.layers.batch_norm(inputs=inputs,is_training=train,

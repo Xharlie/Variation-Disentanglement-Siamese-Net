@@ -57,7 +57,7 @@ class VDSN_FACE(object):
         self.encoder_W51 = tf.Variable(tf.random_normal([3, 3, dim_43_fltr, dim_51_fltr], stddev=0.02), name='encoder_W51')
         self.encoder_W52 = tf.Variable(tf.random_normal([3, 3, dim_51_fltr, dim_52_fltr], stddev=0.02), name='encoder_W52')
         self.encoder_W53 = tf.Variable(tf.random_normal([3, 3, dim_52_fltr, dim_53_fltr], stddev=0.02), name='encoder_W53')
-        self.encoder_WFC = tf.Variable(tf.random_normal([6*6*dim_53_fltr, dim_FC], stddev=0.02), name='encoder_WFC')
+        self.encoder_WFC = tf.Variable(tf.random_normal([dim_53_fltr, dim_FC], stddev=0.02), name='encoder_WFC')
         self.encoder_b11 = bias_variable([dim_11_fltr], name='en_b11')
         self.encoder_b12 = bias_variable([dim_12_fltr], name='en_b12')
         self.encoder_b21 = bias_variable([dim_21_fltr], name='en_b21')
@@ -134,7 +134,7 @@ class VDSN_FACE(object):
         self.gan_discrim_W51 = tf.Variable(tf.random_normal([3, 3, dim_43_fltr, dim_51_fltr], stddev=0.02), name='gan_discrim_W51')
         self.gan_discrim_W52 = tf.Variable(tf.random_normal([3, 3, dim_51_fltr, dim_52_fltr], stddev=0.02), name='gan_discrim_W52')
         self.gan_discrim_W53 = tf.Variable(tf.random_normal([3, 3, dim_52_fltr, dim_53_fltr], stddev=0.02), name='gan_discrim_W53')
-        self.gan_discrim_WFC = tf.Variable(tf.random_normal([6*6*dim_53_fltr, dim_FC], stddev=0.02), name='gan_discrim_WFC')
+        self.gan_discrim_WFC = tf.Variable(tf.random_normal([dim_53_fltr, dim_FC], stddev=0.02), name='gan_discrim_WFC')
         self.gan_discrim_WFC1 = tf.Variable(tf.random_normal([dim_FC, dim_y+1], stddev=0.02), name='gan_discrim_WFC1')
         self.gan_discrim_b11 = bias_variable([dim_11_fltr], name='gan_dis_b11')
         self.gan_discrim_b12 = bias_variable([dim_12_fltr], name='gan_dis_b12')
@@ -337,7 +337,7 @@ class VDSN_FACE(object):
         with tf.name_scope('gan_discrim_avg_pool'):
             h_pool = avg_pool_6x6(h_conv53)
         with tf.name_scope('gan_discrim_fc'):
-            h_pool_flat = tf.reshape(h_pool, [-1,6*6*self.dim_53_fltr])
+            h_pool_flat = tf.reshape(h_pool, [-1, self.dim_53_fltr])
             h_fc = lrelu(batchnormalize(tf.matmul(h_pool_flat, self.gan_discrim_WFC) + self.gan_discrim_bFC,
                                         'gan_dis_bn', train=self.is_training, reuse=reuse))
         with tf.name_scope('gan_dis_fc2'):
@@ -435,7 +435,7 @@ class VDSN_FACE(object):
             h_pool= avg_pool_6x6(h_conv53)
         # Fully connected layer 320 to 512 features
         with tf.name_scope('encoder_fc'):
-            h_pool_flat = tf.reshape(h_pool, [-1, 6*6*self.dim_53_fltr])
+            h_pool_flat = tf.reshape(h_pool, [-1, self.dim_53_fltr])
             h_fc = lrelu(batchnormalize(tf.matmul(h_pool_flat, self.encoder_WFC),
                         'en_hfc', train=self.is_training, reuse=reuse))
         F_I, F_V = tf.split(h_fc, [self.dim_F_I, self.dim_F_V], axis = 1)
