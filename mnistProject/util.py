@@ -113,5 +113,5 @@ def sort_by_identity(teX, teY):
 
 def draw_frame(img, w, channel):
     for i in range(img.shape[1] / (3 * w)):
-        img[:, i * 3 * w : (i * 3) * w + 2, channel] = 255
+        img[:, i * 3 * w : (i * 3) * w + 2, channel] = 1
     return img

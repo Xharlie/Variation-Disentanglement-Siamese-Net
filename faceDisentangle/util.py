@@ -60,6 +60,7 @@ def save_visualization_triplet(X_I, X_V, X, nh_nw, save_path='./vis_triple/sampl
         img[j*h:j*h+h, (3*i)*w:(3*i+1)*w, :] = X_I[n]
         img[j*h:j*h+h, (3*i+1)*w:(3*i+2)*w, :] = X_V[n]
         img[j*h:j*h+h, (3*i+2)*w:(3*i+3)*w, :] = X[n]
+    draw_frame(img, w, 1)
     scipy.misc.imsave(save_path, img)
 
 def check_create_dir(dir):
@@ -103,6 +104,9 @@ def crop2Target(image):
 def normalizaion(image):
     return (image - 127.0) / 255.
 
+def recover(img):
+    return int(img * 255. + 127.)
+
 def CASIA_load(file_path):
     dataSets = []
     labelSet = []
@@ -116,3 +120,8 @@ def CASIA_load(file_path):
             labelSet.append(label2int)
         label2int += 1
     return np.array(dataSets), np.array(labelSet)
+
+def draw_frame(img, w, channel):
+    for i in range(img.shape[1] / (3 * w)):
+        img[:, i * 3 * w : (i * 3) * w + 2, channel] = 255
+    return img

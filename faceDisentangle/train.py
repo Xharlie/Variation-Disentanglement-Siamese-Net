@@ -360,10 +360,12 @@ with tf.Session(config=config) as sess:
                                 image_tf_real_right: corrRightVal.reshape([-1, 96, 96, 3])
                             })
                         # since 16 * 8  = batch size * 2
-                        save_visualization_triplet(image_real_left, corrRightVal.reshape([-1, 96, 96, 3]),
-                                           (int(math.ceil(batch_size ** (.5))),
-                                            int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
-                                            save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(iterations))
+                        save_visualization_triplet(recover(image_real_left), corrRightVal.reshape([-1, 96, 96, 3]),
+                                                   recover(generated_samples_left),
+                                                   (int(math.ceil(batch_size ** (.5))),
+                                                    int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
+                                                   save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(
+                                                       iterations))
                         VDSN_model.is_training = True
                 else:
                     # start to train gan, D first
