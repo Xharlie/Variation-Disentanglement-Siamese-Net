@@ -217,16 +217,29 @@ class VDSN(object):
         return loss
 
     def gen_disentangle_cost(self, label, logits):
-        minus_one_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-            labels=label, logits=1 - logits))
+        p = tf.nn.softmax(logits)
+        minus_one_loss = tf.reduce_mean(self.entropy_calculation(label, 1-p))
         negative_log_loss = -1 * tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
             labels=label, logits=logits))
+        entropy_loss = -1 * self.entropy_calculation(p,p)
         if self.disentangle_obj_func == 'one_minus':
             return minus_one_loss
-        elif self.disentangle_obj_func == 'negative_log':
+        if self.disentangle_obj_func == 'negative_log':
             return negative_log_loss
-        return (minus_one_loss + negative_log_loss) / 2
+        if self.disentangle_obj_func == 'entropy':
+            return entropy_loss / 10
+        if self.disentangle_obj_func == 'hybrid':
+            return (minus_one_loss + negative_log_loss) / 2
+        return (minus_one_loss + negative_log_loss) / 2 + entropy_loss / 10
 
+    def entropy_calculation(self, p1, p2):
+        p1 = tf.convert_to_tensor(p1)
+        p2 = tf.convert_to_tensor(p2)
+        precise_p2 = tf.cast(p2, tf.float32) if (
+            p2.dtype == tf.float16) else p2
+        # labels and logits must be of the same type
+        p1 = tf.cast(p1, precise_p2.dtype)
+        return tf.reduce_mean(-tf.reduce_sum(p1 * tf.log(p2), reduction_indices=[1]))
 
     def encoder(self, image, reuse=False):
 
