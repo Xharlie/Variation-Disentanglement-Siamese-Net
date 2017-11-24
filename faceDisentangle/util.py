@@ -107,9 +107,12 @@ def CASIA_load(file_path):
     dataSets = []
     labelSet = []
     label2int = 0
-    for file in glob.glob(file_path):
-        for image in glob.glob(file + '/*.jpg'):
-            dataSets.append(normalizaion(crop2Target(scipy.misc.imread(image))))
+    for file in glob.glob(file_path)[:2]:
+        for imagePath in glob.glob(file + '/*.jpg'):
+	    image = scipy.misc.imread(imagePath)
+            if len(image.shape) != 3:
+                continue
+            dataSets.append(normalizaion(crop2Target(image)))
             labelSet.append(label2int)
         label2int += 1
     return np.array(dataSets), np.array(labelSet)

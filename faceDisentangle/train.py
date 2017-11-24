@@ -143,10 +143,11 @@ n_epochs = args.n_epochs
 batch_size = args.batch_size
 image_shape = [96, 96, 3]
 
-file_path = "../data/image_sample/*"
+file_path = "../../face_experiments/OurNormalizedFaces125x125CropTarget100x100/*"
 directory_list = glob.glob(file_path)
 
-dim_y = len(directory_list)
+# dim_y = len(directory_list)
+dim_y = 2
 
 # amount of class label
 dim_11_fltr=32
@@ -288,9 +289,8 @@ with tf.Session(config=config) as sess:
                     range(0, len(trY), batch_size),
                     range(batch_size, len(trY), batch_size)
                     ):
-                Xs_left = trX[start: end].reshape([-1, 96, 96, 3])
+                Xs_left = trX[start: end].reshape([-1, 96, 96, 3]) 
                 Ys_left = OneHot(trY[start: end], dim_y)
-                Xs_right = []
                 Ys_right = []
                 modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
 
@@ -301,7 +301,7 @@ with tf.Session(config=config) as sess:
                     Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_D_F_V", dim=dim_y)
                     Ys_right = OneHot(Ys_right, dim_y)
                     Xs_right = Xs_right.reshape([-1, 96, 96, 3])
-
+		print Xs_left.shape
                 if modulus < args.recon_series:
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
                             dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
