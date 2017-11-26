@@ -2,73 +2,60 @@ from scipy import misc
 import glob
 import os.path
 import numpy as np
+import tensorflow as tf
+import cv2
+from util import *
+
+def save_data2record(tf_path, file_path):
+    writer = tf.python_io.TFRecordWriter("train.tfrecords")
+    label2int = 0
+    for class_path in glob.glob(file_path):
+        for image_path in glob.glob(class_path + "/*.jpg"):
+            image = scipy.misc.imread(image_path)
+            if len(image.shape) != 3:
+                continue
+            image_raw = crop2Target(image).tostring()
+            example = tf.train.Example(features=tf.train.Features(feature={
+                    'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label2int])),
+                    'image_raw': tf.train.Feature(bytes_list=tf.train.BytesList(value=[image_raw]))
+                }))
+            writer.write(example.SerializeToString())
+        label2int += 1
+    writer.close()
 
 
-def web_face_load(directory_file, batchSize, feature="F_I_F_V"):
-    '''
-    Load a batch size of images from the file directory:
-        input:
-            file_path: The image directory
-            batch_size: The batch size
-        return:
-            left_images: np.array
-                The left image (shape = (batch_size, 96, 96, 3))
-            right_images: np.array
-                The right image (shape = (batch_size, 96, 96, 3))
-            labels_left: list
-                labels: The labels (shape = (batch_size))
-            labels_right: same format as labels_left
-    '''
+def read_and_decode(file_name):
+    fileName_queue = tf.train.string_input_producer([file_name])
 
-    left_images = np.zeros((batchSize, 96, 96, 3), dtype=np.float32)
-    right_images = np.zeros_like(left_images, dtype=np.float32)
-    labels_left = []
-    labels_right = []
-    if feature == "F_I_F_V":
-        for count in range(batchSize):
-            randPerson_left = np.random.randint(0, len(directory_file))
-            [left_image_path, right_image_path] = np.random.choice(glob.glob(glob.glob(directory_file)[randPerson_left] + '/*.jpg'), 2)
-            if os.path.isfile(left_image_path) and os.path.isfile(right_image_path):
-                left_images[count] = normalization(crop2Target(misc.imread(left_image_path)))
-                right_images[count] = normalization(crop2Target(misc.imread(right_image_path)))
-            labels_left.append(randPerson_left)
-            labels_right.append(randPerson_left)
-    else:
-        for count in range(batchSize):
-            randPerson_left = np.random.randint(0, len(directory_file))
-            while True:
-                randPerson_right = np.random.randint(0, len(directory_file))
-                if randPerson_right != randPerson_left:
-                    break
-            left_image_path = np.random.choice(glob.glob(glob.glob(directory_file)[randPerson_left] + '/*.jpg'), 1)
-            right_image_path = np.random.choice(glob.glob(glob.glob(directory_file)[randPerson_right] + '/*.jpg'), 1)
-            if os.path.isfile(left_image_path) and os.path.isfile(right_image_path):
-                left_images[count] = normalization(crop2Target(misc.imread(left_image_path)))
-                right_images[count] = normalization(crop2Target(misc.imread(right_image_path)))
-            labels_left.append(randPerson_left)
-            labels_right.append(randPerson_right)
-    return left_images, right_images, labels_left, labels_right
+    reader = tf.TFRecordReader()
+    _, serialized_example = reader.read(fileName_queue)
+    features = tf.parse_single_example(serialized_example,
+                                        features={
+                                            'label': tf.FixedLenFeature([], tf.int64),
+                                            'image_raw': tf.FixedLenFeature([], tf.string),
+                                        })
+    img = tf.decode_raw(features['image_raw'], tf.uint8)
+    img = tf.reshape(img, [96, 96, 3])
+    img = normalizaion(tf.cast(img, tf.float32))
+    label = tf.cast(features['label'], tf.int32)
 
-'''
-The normalization of the input image
-'''
-def normalization(image):
-    image = (image - np.mean(image)) / np.std(image)
-    return image
+    return img, label
 
+def tensor_decode():
+    img, label = read_and_decode("train.tfrecords")
 
-'''
-Randomly crop 125*125 image to 96*96
-Achieve the data augmentation meanwhile
-'''
-def crop2Target(image):
-    randomNumberX = np.random.randint(0, 28)
-    randomNumberY = np.random.randint(0, 28)
-    return image[randomNumberX:randomNumberX+96, randomNumberY:randomNumberY+96, :]
+    img_batch, label_batch = tf.train.shuffle_batch([img, label],
+                                                    batch_size=70, capacity=200,
+                                                    min_after_dequeue=100)
+    init = tf.initialize_all_variables()
 
+    with tf.Session() as sess:
+        sess.run(init)
+        threads = tf.train.start_queue_runners(sess=sess)
+        for i in range(3):
+            val, l= sess.run([img_batch, label_batch])
+            print(val, l)
 
-# '''
-# Only for Unitest
-# '''
-# if __name__ == "__main__":
-#     web_face_load("../data/image_sample", 1)
+if __name__ == '__main__':
+    # save_data2record('train.tfrecords', '../data/image_sample/*')
+    tensor_decode()
