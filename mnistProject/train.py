@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--gen_start_learning_rate", nargs='?', type=float, default=0.002,
                     help="learning rate")
 
-parser.add_argument("--dis_start_learning_rate", nargs='?', type=float, default=0.002,
+parser.add_argument("--dis_start_learning_rate", nargs='?', type=float, default=0.01,
                     help="learning rate")
 
 parser.add_argument("--gan_start_learning_rate", nargs='?', type=float, default=0.002,
@@ -74,8 +74,11 @@ parser.add_argument("--dis_series", nargs='?', type=int, default=10,
 parser.add_argument("--gan_series", nargs='?', type=int, default=1,
                     help="how many time the generator with gan task can train consecutively")
 
-parser.add_argument("--drawing_step", nargs='?', type=int, default=10000,
+parser.add_argument("--drawing_step", nargs='?', type=int, default=200000,
                     help="how many steps to draw a comparision pic")
+
+parser.add_argument("--save_step", nargs='?', type=int, default=200000,
+                    help="how many steps to save")
 
 parser.add_argument("--gen_regularizer_weight", nargs='?', type=float, default=0.01,
                     help="generator regularization weight")
@@ -115,6 +118,9 @@ parser.add_argument("--disentangle_obj_func", nargs='?', type=str, default='nega
 
 parser.add_argument("--debug", action="store_true",
                     help="debug_mode")
+
+parser.add_argument("--train_bn", action="store_true",
+                    help="train bn's gamma and beta")
 
 # >==================  F_V_validation args =======================<
 
@@ -200,14 +206,20 @@ dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, glo
 gan_learning_rate = tf.train.exponential_decay(args.gan_start_learning_rate, global_step,
                                                args.gan_decay_step, args.gan_decay_rate, staircase=True)
 
-print [x.name for x in tf.trainable_variables() if x.name.startswith('gan')]
-
-dis_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
-gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
-cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
-gan_dis_vars = filter(lambda x: x.name.startswith('gan'), tf.trainable_variables())
-# include en_* and encoder_* W and b,
-encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
+if args.train_bn:
+    dis_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
+    gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
+    cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
+    gan_dis_vars = filter(lambda x: x.name.startswith('gan'), tf.trainable_variables())
+    # include en_* and encoder_* W and b,
+    encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
+else:
+    dis_vars = filter(lambda x: x.name.startswith('dis') and 'bn' not in x.name, tf.trainable_variables())
+    gen_vars = filter(lambda x: x.name.startswith('gen') and 'bn' not in x.name, tf.trainable_variables())
+    cla_vars = filter(lambda x: x.name.startswith('cla') and 'bn' not in x.name, tf.trainable_variables())
+    gan_dis_vars = filter(lambda x: x.name.startswith('gan') and 'bn' not in x.name, tf.trainable_variables())
+    # include en_* and encoder_* W and b,
+    encoder_vars = filter(lambda x: x.name.startswith('en') and 'bn' not in x.name, tf.trainable_variables())
 
 with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
     train_op_gen = tf.train.AdamOptimizer(
@@ -396,7 +408,9 @@ with tf.Session(config=config) as sess:
                         print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/" + str(sess.run(bn3_gamma)))
                         print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/" + str(sess.run(bn4_gamma)))
                 iterations += 1
-
+                if np.mod(iterations, args.save_step) == 0 and iterations >= args.save_step:
+                    save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
+                    print("Model saved in file: %s" % save_path)
         # Save the variables to disk.
         save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
         print("Model saved in file: %s" % save_path)
