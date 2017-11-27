@@ -259,6 +259,13 @@ save_path=""
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
+img, label = read_and_decode("train.tfrecords", n_epochs)
+img_batch, label_batch = tf.train.shuffle_batch([img, label],
+                                                batch_size=batch_size, capacity=200,
+                                                min_after_dequeue=100,
+                                                allow_smaller_final_batch=True)
+
+
 with tf.Session(config=config) as sess:
     try:
         sess.run(tf.global_variables_initializer())
@@ -278,12 +285,6 @@ with tf.Session(config=config) as sess:
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
-        img, label = read_and_decode("train.tfrecords", n_epochs)
-        img_batch, label_batch = tf.train.shuffle_batch([img, label],
-                                                        batch_size=batch_size, capacity=200,
-                                                        min_after_dequeue=100,
-                                                        allow_smaller_final_batch=True)
         try:
             while not coord.should_stop():
                 Xs_left, Ys_left = sess.run([img_batch, label_batch])
