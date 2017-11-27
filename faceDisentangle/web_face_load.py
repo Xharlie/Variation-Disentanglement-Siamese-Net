@@ -59,6 +59,7 @@ def tensor_decode(batch_size, n_epochs):
         try:
             while not coord.should_stop():
                 val, l = sess.run([img_batch, label_batch])
+                print l
         except tf.errors.OutOfRangeError:
             print('Done training, epoch reached')
         finally:

@@ -287,27 +287,28 @@ with tf.Session(config=config) as sess:
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
         try:
             while not coord.should_stop():
-                Xs_left, Ys_left = sess.run([img_batch, label_batch])
-
+                Xs_left, Ys_left_label = sess.run([img_batch, label_batch])
+                print "Throw a batch of images"
                 indexTable = [[] for i in range(dim_y)]
-                for index in range(len(Ys_left)):
-                    indexTable[Ys_left[index]].append(index)
+                for index in range(len(Ys_left_label)):
+                    indexTable[Ys_left_label[index]].append(index)
 
-                Ys_left = OneHot(Ys_left, dim_y)
+                Ys_left = OneHot(Ys_left_label, dim_y)
                 Ys_right = []
                 modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
                 start = 0
                 end = len(Ys_left)
                 if modulus < args.dis_series + args.recon_series:
-                    Xs_right, Ys_right = randomPickRight(start, end, Xs_left, Ys_left, indexTable, feature="F_I_F_V",
+                    Xs_right, Ys_right_label = randomPickRight(start, end, Xs_left, Ys_left_label, indexTable, feature="F_I_F_V",
                                                          dim=dim_y)
                     Xs_right = Xs_right.reshape([-1, 96, 96, 3])
                 else:
-                    Xs_right, Ys_right = randomPickRight(start, end, Xs_left, Ys_left, indexTable,
+                    Xs_right, Ys_right_label = randomPickRight(start, end, Xs_left, Ys_left_label, indexTable,
                                                          feature="F_I_F_D_F_V", dim=dim_y)
-                    Ys_right = OneHot(Ys_right, dim_y)
+                    Ys_right = OneHot(Ys_right_label, dim_y)
                     Xs_right = Xs_right.reshape([-1, 96, 96, 3])
                 if modulus < args.recon_series:
+                    print "Prepared to launch training generating"
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
                     dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
                         = sess.run(
@@ -330,8 +331,10 @@ with tf.Session(config=config) as sess:
                     print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
                     print("gen id classifier accuracy:", gen_cla_accuracy_val)
+                    print "Finished generating"
 
                 elif modulus < args.recon_series + args.dis_series:
+                    print "Prepared to launch training discriminator"
                     _, summary, dis_cost_val, dis_total_cost_val, \
                     dis_prediction_val_left, dis_prediction_val_right \
                         = sess.run(
@@ -350,12 +353,13 @@ with tf.Session(config=config) as sess:
                     print("discriminator total weigthted loss:", dis_total_cost_val)
                     print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
                     print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
+                    print "Finished discriminating"
 
                     if np.mod(iterations, drawing_step) == 0:
                         indexTableVal = [[] for i in range(dim_y)]
-                        for index in range(len(Ys_left)):
-                            indexTableVal[Ys_left[index]].append(index)
-                        corrRightVal, _ = randomPickRight(0, visualize_dim, Xs_left, Ys_left, indexTableVal)
+                        for index in range(len(Ys_left_label)):
+                            indexTableVal[Ys_left_label[index]].append(index)
+                        corrRightVal, _ = randomPickRight(0, visualize_dim, Xs_left, Ys_left_label, indexTableVal)
                         image_real_left = Xs_left[0:visualize_dim].reshape([-1, 96, 96, 3])
                         VDSN_model.is_training = False
                         generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
