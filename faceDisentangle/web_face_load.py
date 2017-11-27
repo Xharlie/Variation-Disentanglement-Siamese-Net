@@ -24,8 +24,8 @@ def save_data2record(tf_path, file_path):
     writer.close()
 
 
-def read_and_decode(file_name):
-    fileName_queue = tf.train.string_input_producer([file_name])
+def read_and_decode(file_name, num_epochs=1):
+    fileName_queue = tf.train.string_input_producer([file_name], num_epochs=num_epochs, shuffle=True)
 
     reader = tf.TFRecordReader()
     _, serialized_example = reader.read(fileName_queue)
@@ -41,21 +41,31 @@ def read_and_decode(file_name):
 
     return img, label
 
-def tensor_decode():
-    img, label = read_and_decode("train.tfrecords")
+
+def tensor_decode(batch_size, n_epochs):
+    img, label = read_and_decode("train.tfrecords", n_epochs)
 
     img_batch, label_batch = tf.train.shuffle_batch([img, label],
-                                                    batch_size=70, capacity=200,
-                                                    min_after_dequeue=100)
-    init = tf.initialize_all_variables()
+                                                    batch_size=batch_size, capacity=200,
+                                                    min_after_dequeue=100,
+                                                    allow_smaller_final_batch=True)
+
 
     with tf.Session() as sess:
-        sess.run(init)
-        threads = tf.train.start_queue_runners(sess=sess)
-        for i in range(3):
-            val, l= sess.run([img_batch, label_batch])
-            print(val, l)
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer())
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        try:
+            while not coord.should_stop():
+                val, l = sess.run([img_batch, label_batch])
+        except tf.errors.OutOfRangeError:
+            print('Done training, epoch reached')
+        finally:
+            coord.request_stop()
+        coord.join(threads)
+
 
 if __name__ == '__main__':
     # save_data2record('train.tfrecords', '../data/image_sample/*')
-    tensor_decode()
+    tensor_decode(8, 2)

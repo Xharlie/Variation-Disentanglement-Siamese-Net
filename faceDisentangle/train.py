@@ -146,8 +146,8 @@ image_shape = [96, 96, 3]
 file_path = "../../face_experiments/OurNormalizedFaces125x125CropTarget100x100/*"
 directory_list = glob.glob(file_path)
 
-# dim_y = len(directory_list)
-dim_y = 2
+dim_y = len(directory_list)
+# dim_y = 2
 
 # amount of class label
 dim_11_fltr=32
@@ -184,7 +184,7 @@ model_dir = check_create_dir(args.model_dir_parent + time_dir + '/')
 visualize_dim = batch_size
 drawing_step = args.drawing_step
 
-trX, trY = CASIA_load(file_path)
+# trX, trY = CASIA_load(file_path)
 
 VDSN_model = VDSN_FACE(
                 batch_size=batch_size,
@@ -262,6 +262,7 @@ config.gpu_options.allow_growth = True
 with tf.Session(config=config) as sess:
     try:
         sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer())
         # writer for tensorboard summary
         training_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
         # test_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
@@ -275,45 +276,49 @@ with tf.Session(config=config) as sess:
             pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
             pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
 
-        for epoch in range(n_epochs):
-            index = np.arange(len(trY))
-            np.random.shuffle(index)
-            trX = trX[index]
-            trY = trY[index]
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-            indexTable = [[] for i in range(dim_y)]
-            for index in range(len(trY)):
-                indexTable[trY[index]].append(index)
+        img, label = read_and_decode("train.tfrecords", n_epochs)
+        img_batch, label_batch = tf.train.shuffle_batch([img, label],
+                                                        batch_size=batch_size, capacity=200,
+                                                        min_after_dequeue=100,
+                                                        allow_smaller_final_batch=True)
+        try:
+            while not coord.should_stop():
+                Xs_left, Ys_left = sess.run([img_batch, label_batch])
 
-            for start, end in zip(
-                    range(0, len(trY), batch_size),
-                    range(batch_size, len(trY), batch_size)
-                    ):
-                Xs_left = trX[start: end].reshape([-1, 96, 96, 3]) 
-                Ys_left = OneHot(trY[start: end], dim_y)
+                indexTable = [[] for i in range(dim_y)]
+                for index in range(len(Ys_left)):
+                    indexTable[Ys_left[index]].append(index)
+
+                Ys_left = OneHot(Ys_left, dim_y)
                 Ys_right = []
                 modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
-
+                start = 0
+                end = len(Ys_left)
                 if modulus < args.dis_series + args.recon_series:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=dim_y)
+                    Xs_right, Ys_right = randomPickRight(start, end, Xs_left, Ys_left, indexTable, feature="F_I_F_V",
+                                                         dim=dim_y)
                     Xs_right = Xs_right.reshape([-1, 96, 96, 3])
                 else:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_D_F_V", dim=dim_y)
+                    Xs_right, Ys_right = randomPickRight(start, end, Xs_left, Ys_left, indexTable,
+                                                         feature="F_I_F_D_F_V", dim=dim_y)
                     Ys_right = OneHot(Ys_right, dim_y)
                     Xs_right = Xs_right.reshape([-1, 96, 96, 3])
                 if modulus < args.recon_series:
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
-                            dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
+                    dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
                         = sess.run(
-                            [train_op_gen, merged_summary, g_recon_cost_tf,
-                             gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
-                             dis_prediction_tf_left, dis_prediction_tf_right,gen_cla_accuracy_tf],
-                            feed_dict={
-                                Y_left_tf: Ys_left,
-                                Y_right_tf: Ys_left,
-                                image_tf_real_left: Xs_left,
-                                image_tf_real_right: Xs_right
-                            })
+                        [train_op_gen, merged_summary, g_recon_cost_tf,
+                         gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
+                         dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
+                        feed_dict={
+                            Y_left_tf: Ys_left,
+                            Y_right_tf: Ys_left,
+                            image_tf_real_left: Xs_left,
+                            image_tf_real_right: Xs_right
+                        })
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
                     print("=========== updating G ==========")
                     print("iteration:", iterations)
@@ -327,7 +332,7 @@ with tf.Session(config=config) as sess:
 
                 elif modulus < args.recon_series + args.dis_series:
                     _, summary, dis_cost_val, dis_total_cost_val, \
-                            dis_prediction_val_left, dis_prediction_val_right \
+                    dis_prediction_val_left, dis_prediction_val_right \
                         = sess.run(
                         [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf,
                          dis_prediction_tf_left, dis_prediction_tf_right],
@@ -347,10 +352,10 @@ with tf.Session(config=config) as sess:
 
                     if np.mod(iterations, drawing_step) == 0:
                         indexTableVal = [[] for i in range(dim_y)]
-                        for index in range(len(trY)):
-                            indexTableVal[trY[index]].append(index)
-                        corrRightVal, _ = randomPickRight(0, visualize_dim, trX, trY, indexTableVal)
-                        image_real_left = trX[0:visualize_dim].reshape([-1, 96, 96, 3])
+                        for index in range(len(Ys_left)):
+                            indexTableVal[Ys_left[index]].append(index)
+                        corrRightVal, _ = randomPickRight(0, visualize_dim, Xs_left, Ys_left, indexTableVal)
+                        image_real_left = Xs_left[0:visualize_dim].reshape([-1, 96, 96, 3])
                         VDSN_model.is_training = False
                         generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                             [image_gen_left, F_V_left_tf, F_I_left_tf],
@@ -359,7 +364,8 @@ with tf.Session(config=config) as sess:
                                 image_tf_real_right: corrRightVal.reshape([-1, 96, 96, 3])
                             })
                         # since 16 * 8  = batch size * 2
-                        save_visualization_triplet(recover(image_real_left), corrRightVal.reshape([-1, 96, 96, 3]),
+                        save_visualization_triplet(recover(image_real_left),
+                                                   corrRightVal.reshape([-1, 96, 96, 3]),
                                                    recover(generated_samples_left),
                                                    (int(math.ceil(batch_size ** (.5))),
                                                     int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
@@ -371,7 +377,7 @@ with tf.Session(config=config) as sess:
                     _, summary, gan_dis_cost \
                         = sess.run(
                         [train_op_gan_discrim, merged_summary, gan_dis_cost_tf],
-                            feed_dict={
+                        feed_dict={
                             Y_left_tf: Ys_left,
                             Y_right_tf: Ys_right,
                             image_tf_real_left: Xs_left,
@@ -385,7 +391,7 @@ with tf.Session(config=config) as sess:
                     # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
                     # train G
                     _, summary, gan_gen_cost_val, gen_disentangle_val, gen_cla_cost_val, gan_total_cost_val, \
-                        dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
+                    dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
                         = sess.run(
                         [train_op_gan_gen, merged_summary, gan_gen_cost_tf,
                          gen_disentangle_cost_tf, gen_cla_cost_tf, gan_total_cost_tf,
@@ -409,9 +415,16 @@ with tf.Session(config=config) as sess:
                     # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
                 iterations += 1
 
-            if iterations % 10000 == 0:
-                save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
-                print("Model saved in file: %s" % save_path)
+                if iterations % 10000 == 0:
+                    save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
+                    print("Model saved in file: %s" % save_path)
+        except tf.errors.OutOfRangeError:
+            print('Done training, epoch reached')
+        finally:
+            coord.request_stop()
+        coord.join(threads)
+
+
 
     except KeyboardInterrupt:
         print("Manual interrupt occurred.")

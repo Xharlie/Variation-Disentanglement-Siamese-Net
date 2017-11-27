@@ -3,7 +3,6 @@ import scipy.misc
 import numpy as np
 import os
 import os.path
-import tensorflow as tf
 import glob
 
 def OneHot(X, n=None, negative_class=0.):
@@ -31,17 +30,6 @@ def crop_resize(image_path, resize_shape=(64,64)):
         resized_image = resized_image[cropping_length:cropping_length+resize_shape[0], :]
 
     return resized_image/127.5 - 1
-
-def save_visualization_interpolation(img_matrix, save_path='./vis_triple/sample.jpg'):
-    rows,columns = len(img_matrix), len(img_matrix[0])
-    per_cell_size = img_matrix[0][0].shape[0]
-    # print rows,columns,per_cell_size
-    img = np.zeros((rows * per_cell_size, columns * per_cell_size, 3))
-    for r in range(rows):
-        for c in range(columns):
-            img[r*per_cell_size:(r+1)*per_cell_size,
-            c*per_cell_size:(c+1)*per_cell_size, :] = img_matrix[r][c]
-    scipy.misc.imsave(save_path, img)
 
 def save_visualization(X_origin, X, nh_nw, save_path='./vis/sample.jpg'):
     h,w = X.shape[1], X.shape[2]
@@ -117,7 +105,7 @@ def normalizaion(image):
     return (image - 127.0) / 255.
 
 def recover(img):
-    return tf.cast(img * 255. + 127., tf.uint8)
+    return int(img * 255. + 127.)
 
 def CASIA_load(file_path):
     dataSets = []
