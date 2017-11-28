@@ -78,7 +78,7 @@ def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10)
         while True:
             if feature == "F_I_F_V":
                 randomPick = np.random.choice(indexTable[trY[i]], 1)[0]
-                if randomPick == i:
+                if ((randomPick == i) and (len(indexTable[trY[i]]) != 1)):
                     continue
                 else:
                     randomList.append(randomPick)
@@ -86,6 +86,8 @@ def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10)
             else:
                 index = np.random.randint(low=0, high=dim)
                 if index == trY[i]:
+                    continue
+                if len(indexTable[index]) == 0:
                     continue
                 randomList.append(np.random.choice(indexTable[index], 1)[0])
                 Y_right.append(index)
@@ -105,13 +107,13 @@ def normalizaion(image):
     return (image - 127.0) / 255.
 
 def recover(img):
-    return int(img * 255. + 127.)
+    return img * 255. + 127.
 
 def CASIA_load(file_path):
     dataSets = []
     labelSet = []
     label2int = 0
-    for file in glob.glob(file_path)[:2]:
+    for file in glob.glob(file_path):
         for imagePath in glob.glob(file + '/*.jpg'):
             image = scipy.misc.imread(imagePath)
             if len(image.shape) != 3:

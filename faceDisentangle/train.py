@@ -11,6 +11,7 @@ import glob
 import json
 import math
 import copy
+import sys
 
 parser = argparse.ArgumentParser()
 
@@ -261,7 +262,7 @@ config.gpu_options.allow_growth = True
 
 img, label = read_and_decode("train.tfrecords", n_epochs)
 img_batch, label_batch = tf.train.shuffle_batch([img, label],
-                                                batch_size=batch_size, capacity=200,
+                                                batch_size=batch_size*10, capacity=200,
                                                 min_after_dequeue=100,
                                                 allow_smaller_final_batch=True)
 
@@ -284,145 +285,155 @@ with tf.Session(config=config) as sess:
             pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
 
         coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        threads = tf.train.start_queue_runners(coord=coord)
         try:
             while not coord.should_stop():
-                Xs_left, Ys_left_label = sess.run([img_batch, label_batch])
-                print "Throw a batch of images"
+                trX, trY = sess.run([img_batch, label_batch])
                 indexTable = [[] for i in range(dim_y)]
-                for index in range(len(Ys_left_label)):
-                    indexTable[Ys_left_label[index]].append(index)
+                for index in range(len(trY)):
+                    indexTable[trY[index]].append(index)
+                    print indexTable[trY[index]]
+                for start, end in zip(
+                        range(0, len(trY), batch_size),
+                        range(batch_size, len(trY), batch_size)
+                ):
+                    print "Throw a batch of images"
+                    Xs_left = trX[start:end].reshape([-1, 96, 96, 3])
+                    Ys_left = OneHot(trY[start:end], dim_y)
+                    Xs_right = []
+                    Ys_right = []
+                    modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
 
-                Ys_left = OneHot(Ys_left_label, dim_y)
-                Ys_right = []
-                modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
-                start = 0
-                end = len(Ys_left)
-                if modulus < args.dis_series + args.recon_series:
-                    Xs_right, Ys_right_label = randomPickRight(start, end, Xs_left, Ys_left_label, indexTable, feature="F_I_F_V",
-                                                         dim=dim_y)
-                    Xs_right = Xs_right.reshape([-1, 96, 96, 3])
-                else:
-                    Xs_right, Ys_right_label = randomPickRight(start, end, Xs_left, Ys_left_label, indexTable,
-                                                         feature="F_I_F_D_F_V", dim=dim_y)
-                    Ys_right = OneHot(Ys_right_label, dim_y)
-                    Xs_right = Xs_right.reshape([-1, 96, 96, 3])
-                if modulus < args.recon_series:
-                    print "Prepared to launch training generating"
-                    _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
-                    dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
-                        = sess.run(
-                        [train_op_gen, merged_summary, g_recon_cost_tf,
-                         gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
-                         dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
-                        feed_dict={
-                            Y_left_tf: Ys_left,
-                            Y_right_tf: Ys_left,
-                            image_tf_real_left: Xs_left,
-                            image_tf_real_right: Xs_right
-                        })
-                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-                    print("=========== updating G ==========")
-                    print("iteration:", iterations)
-                    print("gen reconstruction loss:", gen_recon_cost_val)
-                    print("gen disentanglement loss :", gen_disentangle_val)
-                    print("gen id classifier loss :", gen_cla_cost_val)
-                    print("total weigthted gen loss :", gen_total_cost_val)
-                    print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
-                    print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
-                    print("gen id classifier accuracy:", gen_cla_accuracy_val)
-                    print "Finished generating"
-
-                elif modulus < args.recon_series + args.dis_series:
-                    print "Prepared to launch training discriminator"
-                    _, summary, dis_cost_val, dis_total_cost_val, \
-                    dis_prediction_val_left, dis_prediction_val_right \
-                        = sess.run(
-                        [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf,
-                         dis_prediction_tf_left, dis_prediction_tf_right],
-                        feed_dict={
-                            Y_left_tf: Ys_left,
-                            Y_right_tf: Ys_left,
-                            image_tf_real_left: Xs_left,
-                            image_tf_real_right: Xs_right
-                        })
-                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-                    print("=========== updating D ==========")
-                    print("iteration:", iterations)
-                    print("discriminator loss:", dis_cost_val)
-                    print("discriminator total weigthted loss:", dis_total_cost_val)
-                    print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
-                    print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
-                    print "Finished discriminating"
-
-                    if np.mod(iterations, drawing_step) == 0:
-                        indexTableVal = [[] for i in range(dim_y)]
-                        for index in range(len(Ys_left_label)):
-                            indexTableVal[Ys_left_label[index]].append(index)
-                        corrRightVal, _ = randomPickRight(0, visualize_dim, Xs_left, Ys_left_label, indexTableVal)
-                        image_real_left = Xs_left[0:visualize_dim].reshape([-1, 96, 96, 3])
-                        VDSN_model.is_training = False
-                        generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
-                            [image_gen_left, F_V_left_tf, F_I_left_tf],
+                    if modulus < args.dis_series + args.recon_series:
+                        Xs_right, Ys_right_label = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V",
+                                                             dim=dim_y)
+                        Xs_right = Xs_right.reshape([-1, 96, 96, 3])
+                    else:
+                        Xs_right, Ys_right_label = randomPickRight(start, end, trX, trY, indexTable,
+                                                             feature="F_I_F_D_F_V", dim=dim_y)
+                        Ys_right = OneHot(Ys_right_label, dim_y)
+                        Xs_right = Xs_right.reshape([-1, 96, 96, 3])
+                    if modulus < args.recon_series:
+                        print "Prepared to launch training generating"
+                        _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
+                        dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
+                            = sess.run(
+                            [train_op_gen, merged_summary, g_recon_cost_tf,
+                             gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
+                             dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
                             feed_dict={
-                                image_tf_real_left: image_real_left,
-                                image_tf_real_right: corrRightVal.reshape([-1, 96, 96, 3])
+                                Y_left_tf: Ys_left,
+                                Y_right_tf: Ys_left,
+                                image_tf_real_left: Xs_left,
+                                image_tf_real_right: Xs_right
                             })
-                        # since 16 * 8  = batch size * 2
-                        save_visualization_triplet(recover(image_real_left),
-                                                   corrRightVal.reshape([-1, 96, 96, 3]),
-                                                   recover(generated_samples_left),
-                                                   (int(math.ceil(batch_size ** (.5))),
-                                                    int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
-                                                   save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(
-                                                       iterations))
-                        VDSN_model.is_training = True
-                else:
-                    # start to train gan, D first
-                    _, summary, gan_dis_cost \
-                        = sess.run(
-                        [train_op_gan_discrim, merged_summary, gan_dis_cost_tf],
-                        feed_dict={
-                            Y_left_tf: Ys_left,
-                            Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left,
-                            image_tf_real_right: Xs_right
-                        }
-                    )
-                    print("=========== updating gan D ==========")
-                    print("iteration:", iterations)
-                    print("gan_dis_cost:", gan_dis_cost)
-                    # moving_mean = filter(lambda x: x.name.startswith('gan_dis_bn1/moving_mean'), tf.all_variables())[0]
-                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
-                    # train G
-                    _, summary, gan_gen_cost_val, gen_disentangle_val, gen_cla_cost_val, gan_total_cost_val, \
-                    dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
-                        = sess.run(
-                        [train_op_gan_gen, merged_summary, gan_gen_cost_tf,
-                         gen_disentangle_cost_tf, gen_cla_cost_tf, gan_total_cost_tf,
-                         dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
-                        feed_dict={
-                            Y_left_tf: Ys_left,
-                            Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left,
-                            image_tf_real_right: Xs_right
-                        })
-                    print("=========== updating gan G ==========")
-                    print("iteration:", iterations)
-                    print("gan gen loss:", gan_gen_cost_val)
-                    print("gen disentanglement loss :", gen_disentangle_val)
-                    print("gen id classifier loss :", gen_cla_cost_val)
-                    print("total weigthted gan loss :", gan_total_cost_val)
-                    print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
-                    print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
-                    print("gen id classifier accuracy:", gen_cla_accuracy_val)
-                    # moving_mean = filter(lambda x: x.name.startswith('en/moving_mean'), tf.all_variables())[0]
-                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
-                iterations += 1
+                        training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                        print("=========== updating G ==========")
+                        print("iteration:", iterations)
+                        print("gen reconstruction loss:", gen_recon_cost_val)
+                        print("gen disentanglement loss :", gen_disentangle_val)
+                        print("gen id classifier loss :", gen_cla_cost_val)
+                        print("total weigthted gen loss :", gen_total_cost_val)
+                        print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
+                        print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
+                        print("gen id classifier accuracy:", gen_cla_accuracy_val)
+                        print "Finished generating"
+                        sys.stdout.flush()
 
-                if iterations % 10000 == 0:
-                    save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
-                    print("Model saved in file: %s" % save_path)
+                    elif modulus < args.recon_series + args.dis_series:
+                        print "Prepared to launch training discriminator"
+                        _, summary, dis_cost_val, dis_total_cost_val, \
+                        dis_prediction_val_left, dis_prediction_val_right \
+                            = sess.run(
+                            [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf,
+                             dis_prediction_tf_left, dis_prediction_tf_right],
+                            feed_dict={
+                                Y_left_tf: Ys_left,
+                                Y_right_tf: Ys_left,
+                                image_tf_real_left: Xs_left,
+                                image_tf_real_right: Xs_right
+                            })
+                        training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                        print("=========== updating D ==========")
+                        print("iteration:", iterations)
+                        print("discriminator loss:", dis_cost_val)
+                        print("discriminator total weigthted loss:", dis_total_cost_val)
+                        print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
+                        print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
+                        print "Finished discriminating"
+                        sys.stdout.flush()
+
+                        if np.mod(iterations, drawing_step) == 0:
+                            indexTableVal = [[] for i in range(dim_y)]
+                            for index in range(len(trY)):
+                                indexTableVal[trY[index]].append(index)
+                            corrRightVal, _ = randomPickRight(0, visualize_dim, trX, trY, indexTableVal)
+                            image_real_left = Xs_left[0:visualize_dim].reshape([-1, 96, 96, 3])
+                            VDSN_model.is_training = False
+                            generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
+                                [image_gen_left, F_V_left_tf, F_I_left_tf],
+                                feed_dict={
+                                    image_tf_real_left: image_real_left,
+                                    image_tf_real_right: corrRightVal.reshape([-1, 96, 96, 3])
+                                })
+                            # since 16 * 8  = batch size * 2
+                            save_visualization_triplet(recover(image_real_left),
+                                                       corrRightVal.reshape([-1, 96, 96, 3]),
+                                                       recover(generated_samples_left),
+                                                       (int(math.ceil(batch_size ** (.5))),
+                                                        int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
+                                                       save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(
+                                                           iterations))
+                            VDSN_model.is_training = True
+                    else:
+
+                        # start to train gan, D first
+                        _, summary, gan_dis_cost \
+                            = sess.run(
+                            [train_op_gan_discrim, merged_summary, gan_dis_cost_tf],
+                            feed_dict={
+                                Y_left_tf: Ys_left,
+                                Y_right_tf: Ys_right,
+                                image_tf_real_left: Xs_left,
+                                image_tf_real_right: Xs_right
+                            }
+                        )
+                        print("=========== updating gan D ==========")
+                        print("iteration:", iterations)
+                        print("gan_dis_cost:", gan_dis_cost)
+                        sys.stdout.flush()
+                        # moving_mean = filter(lambda x: x.name.startswith('gan_dis_bn1/moving_mean'), tf.all_variables())[0]
+                        # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
+                        # train G
+                        _, summary, gan_gen_cost_val, gen_disentangle_val, gen_cla_cost_val, gan_total_cost_val, \
+                        dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
+                            = sess.run(
+                            [train_op_gan_gen, merged_summary, gan_gen_cost_tf,
+                             gen_disentangle_cost_tf, gen_cla_cost_tf, gan_total_cost_tf,
+                             dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
+                            feed_dict={
+                                Y_left_tf: Ys_left,
+                                Y_right_tf: Ys_right,
+                                image_tf_real_left: Xs_left,
+                                image_tf_real_right: Xs_right
+                            })
+                        print("=========== updating gan G ==========")
+                        print("iteration:", iterations)
+                        print("gan gen loss:", gan_gen_cost_val)
+                        print("gen disentanglement loss :", gen_disentangle_val)
+                        print("gen id classifier loss :", gen_cla_cost_val)
+                        print("total weigthted gan loss :", gan_total_cost_val)
+                        print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
+                        print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
+                        print("gen id classifier accuracy:", gen_cla_accuracy_val)
+                        sys.stdout.flush()
+                        # moving_mean = filter(lambda x: x.name.startswith('en/moving_mean'), tf.all_variables())[0]
+                        # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
+                    iterations += 1
+
+                    if iterations % 10000 == 0:
+                        save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
+                        print("Model saved in file: %s" % save_path)
         except tf.errors.OutOfRangeError:
             print('Done training, epoch reached')
         finally:
