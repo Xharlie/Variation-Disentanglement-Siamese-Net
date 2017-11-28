@@ -178,6 +178,7 @@ check_create_dir(args.logs_dir_root)
 check_create_dir(args.logs_dir_root + args.main_logs_dir_root)
 check_create_dir(args.model_dir_parent)
 check_create_dir(args.pic_dir_parent)
+check_create_dir(args.pic_dir_parent + time_dir)
 
 training_logs_dir = check_create_dir(args.logs_dir_root + args.main_logs_dir_root + time_dir + '/')
 model_dir = check_create_dir(args.model_dir_parent + time_dir + '/')
