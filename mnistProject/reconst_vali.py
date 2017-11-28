@@ -31,8 +31,12 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
     check_create_dir(args.pic_dir_parent)
     pic_dir=args.pic_dir_parent + conf["save_path"].split('/')[-2] + '/'
     check_create_dir(pic_dir)
-    pic_dir=pic_dir + args.feature_selection + '/'
-    check_create_dir(pic_dir)
+    if args.feature_selection == 'interpolation':
+        pic_dir = pic_dir + args.feature_selection + '_' + str(args.interpolation_step) + '/'
+        check_create_dir(pic_dir)
+    else:
+        pic_dir = pic_dir + args.feature_selection + '/'
+        check_create_dir(pic_dir)
     Y_tf, center_representation_tf, image_real_left_tf, \
     image_real_right_tf, image_F_I_tf, image_F_V_tf, image_generated_tf, F_I_left_tf, F_V_left_tf \
         = reconst_vali_model.build_model(conf["feature_selection"])
@@ -40,9 +44,9 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
     global_step = tf.Variable(0, trainable=False)
 
     # discrim_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
-    gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
-    # include en_* and encoder_* W and b,
-    encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
+    # gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
+    # # include en_* and encoder_* W and b,
+    # encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
     iterations = 0
 
     config = tf.ConfigProto()
@@ -55,8 +59,8 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
         for index in range(len(teY)):
             indexTable[teY[index]].append(index)
         if (len(conf["save_path"])>0):
-            # Create a saver. include gen_vars and encoder_vars
-            saver = tf.train.Saver(gen_vars + encoder_vars)
+            # Create a saver. include all vars
+            saver = tf.train.Saver()
             saver.restore(sess, conf["save_path"])
 
         class_center_representations \
@@ -89,22 +93,22 @@ def validate_reconst_identity(conf, trX, trY, vaX, vaY, teX, teY):
                 F_I_left_val, F_V_left_val = sess.run(
                     [F_I_left_tf, F_V_left_tf],
                     feed_dict={image_real_left_tf: Xs_left})
-                print F_I_left_val
+                # print F_I_left_val
                 for j in range(len(indexTable)):
                     Xs_right = teX[indexTable[j][-1]].reshape([-1, 28, 28, 1]) / 255.
                     F_I_right_val, F_V_right_val = sess.run(
                         [F_I_left_tf, F_V_left_tf],
                         feed_dict={image_real_left_tf: Xs_right})
-                    F_I_step = (F_I_right_val - F_I_left_val) / 20.
-                    F_V_step = (F_V_right_val - F_V_left_val) / 20.
+                    F_I_step = np.add(F_I_right_val, -F_I_left_val) / (1. * args.interpolation_step)
+                    F_V_step = np.add(F_V_right_val, - F_V_left_val) / (1. * args.interpolation_step)
                     img_matrix = []
-                    for r in range(21):
+                    for r in range(args.interpolation_step + 1):
                         img_matrix.append([])
-                        for c in range(21):
+                        for c in range(args.interpolation_step + 1):
                             img_gen_val = sess.run(
                                 img_gen_tf,
-                                feed_dict={F_I_tf: F_I_left_val + r * F_I_step,
-                                           F_V_tf: F_V_left_val + c * F_V_step})
+                                feed_dict={F_I_tf: np.add(F_I_left_val, r * F_I_step),
+                                           F_V_tf: np.add(F_V_left_val, c * F_V_step)})
                             img_matrix[r].append(img_gen_val[0])
                     save_visualization_interpolation(img_matrix,
                          save_path=pic_dir + '{}_{}.jpg'.format(indexTable[i][i], indexTable[j][-1]))
@@ -209,6 +213,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='./recon_vis/',
                         help="picture folder for reconstruction validation")
+
+    parser.add_argument("--interpolation_step", nargs='?', type=int, default=5,
+                        help="number of step interval for interpolation")
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind

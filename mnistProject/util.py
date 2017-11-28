@@ -68,6 +68,7 @@ def save_visualization_interpolation(img_matrix, save_path='./vis_triple/sample.
     img = np.zeros((rows * per_cell_size, columns * per_cell_size, 3))
     for r in range(rows):
         for c in range(columns):
+            # print img_matrix[r][c].shape
             img[r*per_cell_size:(r+1)*per_cell_size,
             c*per_cell_size:(c+1)*per_cell_size, :] = img_matrix[r][c]
     scipy.misc.imsave(save_path, img)

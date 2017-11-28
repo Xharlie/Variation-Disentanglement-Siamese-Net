@@ -24,6 +24,8 @@ class reconst_validation_model(model.VDSN):
             dim_W2=dim_W2,
             dim_W3=dim_W3,
             dim_F_I=dim_F_I)
+
+
     '''  
      F_I_0 for F_I and 00,
      F_I_C for F_I and F center 
@@ -69,13 +71,13 @@ class reconst_validation_model(model.VDSN):
     def feature_2_img(self):
         F_I = tf.placeholder(tf.float32, [None, self.dim_F_I])
         F_V = tf.placeholder(tf.float32, [None, self.dim_W1 - self.dim_F_I])
-        h3 = self.generator(F_I, F_V, reuse=False)
+        h3 = self.generator(F_I, F_V, reuse=True)
         image_gen = tf.nn.sigmoid(h3)
         return F_I, F_V, image_gen
 
     def build_class_center(self):
         Y = tf.placeholder(tf.float32, [None])
         image_real = tf.placeholder(tf.float32, [None] + self.image_shape)
-        h_fc1 = self.encoder(image_real)
+        h_fc1 = self.encoder(image_real, reuse=True)
         F_I, F_V = tf.split(h_fc1, num_or_size_splits=2, axis=1)
         return Y, image_real, F_I, F_V
