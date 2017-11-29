@@ -41,6 +41,22 @@ def read_and_decode(file_name, num_epochs=1):
 
     return img, label
 
+def read_and_decode_uint8(file_name):
+    fileName = tf.train.string_input_producer([file_name], num_epochs=1, shuffle=False)
+
+    reader = tf.TFRecordReader()
+    _, serialized_example = reader.read(fileName)
+    features = tf.parse_single_example(serialized_example,
+                                       features={
+                                           'label': tf.FixedLenFeature([], tf.int64),
+                                           'image_raw': tf.FixedLenFeature([], tf.string),
+                                       })
+    img = tf.decode_raw(features['image_raw'], tf.uint8)
+    img = tf.reshape(img, [96, 96, 3])
+    label = tf.cast(features['label'], tf.int32)
+
+    return img, label
+
 
 def tensor_decode(batch_size, n_epochs):
     img, label = read_and_decode("train.tfrecords", n_epochs)
@@ -61,12 +77,40 @@ def tensor_decode(batch_size, n_epochs):
                 val, l = sess.run([img_batch, label_batch])
                 print l
         except tf.errors.OutOfRangeError:
-            print('Done training, epoch reached')
+            print('Done data collecting, epoch reached')
         finally:
             coord.request_stop()
         coord.join(threads)
 
 
+def tensor_decode_all(filePath):
+    record_iterator = tf.python_io.tf_record_iterator(path=filePath)
+
+    img_list = []
+    label_list = []
+    for string_record in record_iterator:
+        example = tf.train.Example()
+        example.ParseFromString(string_record)
+
+        label = (example.features.feature['label']
+                      .int64_list
+                      .value[0])
+
+        img_raw = (example.features.feature['image_raw']
+                      .bytes_list
+                      .value[0])
+
+        img_raw = np.fromstring(img_raw, dtype=np.uint8)
+        img = img_raw.reshape((96, 96, 3))
+        img_list.append(img)
+        label_list.append(int(label))
+
+    return np.array(img_list), np.array(label_list)
+
+
 if __name__ == '__main__':
     # save_data2record('train.tfrecords', '../data/image_sample/*')
-    tensor_decode(8, 2)
+    # tensor_decode(8, 2)
+    img_list, label_list = tensor_decode_all('train.tfrecords')
+    img_list.astype(dtype=np.float32)
+    print img_list, label_list

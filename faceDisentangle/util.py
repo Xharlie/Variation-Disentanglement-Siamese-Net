@@ -78,7 +78,7 @@ def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10)
         while True:
             if feature == "F_I_F_V":
                 randomPick = np.random.choice(indexTable[trY[i]], 1)[0]
-                if ((randomPick == i) and (len(indexTable[trY[i]]) != 1)):
+                if (randomPick == i) and (len(indexTable[trY[i]]) != 1):
                     continue
                 else:
                     randomList.append(randomPick)
