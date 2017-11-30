@@ -187,7 +187,8 @@ visualize_dim = batch_size
 drawing_step = args.drawing_step
 
 trX, trY = tensor_decode_all('train.tfrecords')
-
+print type(trX[0][0][0][0])
+print trX.shape
 VDSN_model = VDSN_FACE(
                 batch_size=batch_size,
                 image_shape=image_shape,
@@ -367,14 +368,15 @@ with tf.Session(config=config) as sess:
                         for index in range(len(trY)):
                             indexTableVal[trY[index]].append(index)
                         corrRightVal, _ = randomPickRight(0, visualize_dim, trX, trY, indexTableVal)
-                        image_real_left = normalizaion(Xs_left[0:visualize_dim].reshape([-1, 96, 96, 3])\
+                        image_real_left = normalizaion(trX[0:visualize_dim].reshape([-1, 96, 96, 3])\
                                                        .astype(dtype=np.float32))
                         VDSN_model.is_training = False
                         generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
                             [image_gen_left, F_V_left_tf, F_I_left_tf],
                             feed_dict={
                                 image_tf_real_left: image_real_left,
-                                image_tf_real_right: normalizaion(corrRightVal.reshape([-1, 96, 96, 3]))
+                                image_tf_real_right: normalizaion(corrRightVal.reshape([-1, 96, 96, 3])\
+                                                                                       .astype(np.float32))
                             })
                         # since 16 * 8  = batch size * 2
                         save_visualization_triplet(recover(image_real_left),
