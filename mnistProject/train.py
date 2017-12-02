@@ -264,10 +264,12 @@ with tf.Session(config=config) as sess:
             pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
 
         for epoch in range(n_epochs):
-            index = np.arange(len(trY))
-            np.random.shuffle(index)
-            trX = trX[index]
-            trY = trY[index]
+            index_disentangle = np.arange(len(trY))
+            np.random.shuffle(index_disentangle)
+            index_reconst = np.arange(len(trY))
+            np.random.shuffle(index_reconst)
+            index_gan = np.arange(len(trY))
+            np.random.shuffle(index_gan)
 
             indexTable = [[] for i in range(10)]
             for index in range(len(trY)):
@@ -277,16 +279,27 @@ with tf.Session(config=config) as sess:
                     range(0, len(trY), batch_size),
                     range(batch_size, len(trY), batch_size)
                     ):
-                Xs_left = trX[start:end].reshape([-1, 28, 28, 1]) / 255.
-                Ys_left = OneHot(trY[start:end], 10)
+                Xs_left_disentangle = trX[index_disentangle[start:end]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_disentangle = OneHot(trY[index_disentangle[start:end]], 10)
+                Xs_left_reconst = trX[index_reconst[start:end]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_reconst = OneHot(trY[index_reconst[start:end]], 10)
+                Xs_left_gan = trX[index_gan[start:end]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_gan = OneHot(trY[index_gan[start:end]], 10)
                 Xs_right=[]
                 Ys_right=[]
                 modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
-                if modulus < args.dis_series + args.recon_series:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable)
+                if modulus < args.recon_series:
+                    Xs_right, Ys_right = randomPickRight(start, end, trX,
+                                                         trY[index_reconst[start:end]], indexTable)
+                    Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
+                elif modulus < args.recon_series + args.dis_series:
+                    Xs_right, Ys_right = randomPickRight(start, end, trX,
+                                                         trY[index_disentangle[start:end]], indexTable)
                     Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
                 else:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_D_F_V")
+                    Xs_right, Ys_right = randomPickRight(start, end, trX,
+                                                         trY[index_disentangle[start:end]], indexTable,
+                                                         feature="F_I_F_D_F_V")
                     Ys_right = OneHot(Ys_right, 10)
                     Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
                 if modulus < args.recon_series:
@@ -297,9 +310,9 @@ with tf.Session(config=config) as sess:
                              gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
                              dis_prediction_tf_left, dis_prediction_tf_right,gen_cla_accuracy_tf],
                             feed_dict={
-                                Y_left_tf:Ys_left,
-                                Y_right_tf:Ys_left,
-                                image_tf_real_left: Xs_left,
+                                Y_left_tf:Ys_left_reconst,
+                                Y_right_tf:Ys_left_reconst,
+                                image_tf_real_left: Xs_left_reconst,
                                 image_tf_real_right: Xs_right
                             })
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
@@ -326,9 +339,9 @@ with tf.Session(config=config) as sess:
                             [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf, \
                              dis_prediction_tf_left, dis_prediction_tf_right],
                             feed_dict={
-                                Y_left_tf:Ys_left,
-                                Y_right_tf:Ys_left,
-                                image_tf_real_left: Xs_left,
+                                Y_left_tf:Ys_left_disentangle,
+                                Y_right_tf:Ys_left_disentangle,
+                                image_tf_real_left: Xs_left_disentangle,
                                 image_tf_real_right: Xs_right
                                 })
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
@@ -367,9 +380,9 @@ with tf.Session(config=config) as sess:
                         = sess.run(
                         [train_op_gan_discrim, merged_summary, gan_dis_cost_tf],
                         feed_dict={
-                            Y_left_tf: Ys_left,
+                            Y_left_tf: Ys_left_gan,
                             Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left,
+                            image_tf_real_left: Xs_left_gan,
                             image_tf_real_right: Xs_right
                         }
                     )
@@ -386,9 +399,9 @@ with tf.Session(config=config) as sess:
                          gen_disentangle_cost_tf, gen_cla_cost_tf, gan_total_cost_tf,
                          dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
                         feed_dict={
-                            Y_left_tf: Ys_left,
+                            Y_left_tf: Ys_left_gan,
                             Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left,
+                            image_tf_real_left: Xs_left_gan,
                             image_tf_real_right: Xs_right
                     })
                     print("=========== updating gan G ==========")
