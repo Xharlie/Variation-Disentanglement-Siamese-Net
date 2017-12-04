@@ -235,7 +235,7 @@ class VDSN(object):
             return entropy_loss / 10
         if self.disentangle_obj_func == 'hybrid':
             return (minus_one_loss + negative_log_loss) / 2
-        return (minus_one_loss + negative_log_loss) / 2 + entropy_loss / 10
+        return (minus_one_loss + negative_log_loss) / 2 + entropy_loss
 
     def entropy_calculation(self, p1, p2):
         p1 = tf.convert_to_tensor(p1)

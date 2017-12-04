@@ -84,7 +84,7 @@ def check_create_dir(dir):
 def randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V", dim=10):
     randomList = []
     Y_right=[]
-    for i in range(start, end):
+    for i in range(0, end-start):
         while True:
             if feature == "F_I_F_V":
                 randomPick = np.random.choice(indexTable[trY[i]], 1)[0]
