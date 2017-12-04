@@ -1,0 +1,1 @@
+3000 --dis_decay_rate 0.99 --batch_size 32 --validate_disentanglement --n_epochs 500 --gan_decay_step 3000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.1_hybridentropy_disweight10_disrate0.01 &
