@@ -10,7 +10,7 @@ This function would train a classifier on top of the representation F,
 make sure it cannot train out the Identity
 '''
 
-def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY):
+def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=False):
 
     check_create_dir(conf["logs_dir_root"])
     check_create_dir(conf["logs_dir_root"] + conf["F_validation_logs_dir_root"])
@@ -132,48 +132,48 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY):
                                         tf.train.global_step(sess, global_step))
 
         ''' test phase at the end '''
+        if test:
+            dis_cost_val_list = []
+            dis_total_cost_val_list = []
+            accuracy_val_list = []
+            for start, end in zip(
+                    range(0, len(teY), conf["F_validation_test_batch_size"]),
+                    range(conf["F_validation_test_batch_size"], len(teY), conf["F_validation_test_batch_size"])
+            ):
+                Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
+                Ys = OneHot(teY[start:end], 10)
 
-        dis_cost_val_list = []
-        dis_total_cost_val_list = []
-        accuracy_val_list = []
-        for start, end in zip(
-                range(0, len(teY), conf["F_validation_test_batch_size"]),
-                range(conf["F_validation_test_batch_size"], len(teY), conf["F_validation_test_batch_size"])
-        ):
-            Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
-            Ys = OneHot(teY[start:end], 10)
-
-            summary, dis_cost_val, dis_total_cost_val, Y_prediction_prob_val, accuracy_val \
-                = sess.run(
-                [test_merged_summary, dis_cost_tf,
-                 dis_total_cost_tf, Y_prediction_prob_tf, accuracy_tf],
-                feed_dict={
-                    Y_tf: Ys,
-                    image_real_tf: Xs,
-                })
-            dis_cost_val_list.append(dis_cost_val)
-            dis_total_cost_val_list.append(dis_total_cost_val)
-            accuracy_val_list.append(accuracy_val)
-        dis_cost_val = sum(dis_cost_val_list) / len(dis_cost_val_list)
-        dis_total_cost_val = sum(dis_total_cost_val_list) / len(dis_total_cost_val_list)
-        accuracy_val = sum(accuracy_val_list) / len(accuracy_val_list)
-        print("=========== iteration: ==========", iterations)
-        print("test discriminator loss:", dis_cost_val)
-        print("test discriminator total weigthted loss:", dis_total_cost_val)
-        print("test discriminator accuracy:", accuracy_val)
-        test_dis_cost_val_summary = tf.Summary(
-            value=[tf.Summary.Value(tag="test_dis_cost", simple_value=dis_cost_val)])
-        training_writer.add_summary(test_dis_cost_val_summary,
-                                    tf.train.global_step(sess, global_step))
-        test_dis_total_cost_val_summary = tf.Summary(
-            value=[tf.Summary.Value(tag="test_dis_total_cost", simple_value=dis_total_cost_val)])
-        training_writer.add_summary(test_dis_total_cost_val_summary,
-                                    tf.train.global_step(sess, global_step))
-        test_accuracy_val_summary = tf.Summary(
-            value=[tf.Summary.Value(tag="test_accuracy", simple_value=accuracy_val)])
-        training_writer.add_summary(test_accuracy_val_summary,
-                                    tf.train.global_step(sess, global_step))
-        # except KeyboardInterrupt
+                summary, dis_cost_val, dis_total_cost_val, Y_prediction_prob_val, accuracy_val \
+                    = sess.run(
+                    [test_merged_summary, dis_cost_tf,
+                     dis_total_cost_tf, Y_prediction_prob_tf, accuracy_tf],
+                    feed_dict={
+                        Y_tf: Ys,
+                        image_real_tf: Xs,
+                    })
+                dis_cost_val_list.append(dis_cost_val)
+                dis_total_cost_val_list.append(dis_total_cost_val)
+                accuracy_val_list.append(accuracy_val)
+            dis_cost_val = sum(dis_cost_val_list) / len(dis_cost_val_list)
+            dis_total_cost_val = sum(dis_total_cost_val_list) / len(dis_total_cost_val_list)
+            accuracy_val = sum(accuracy_val_list) / len(accuracy_val_list)
+            print("=========== iteration: ==========", iterations)
+            print("test discriminator loss:", dis_cost_val)
+            print("test discriminator total weigthted loss:", dis_total_cost_val)
+            print("test discriminator accuracy:", accuracy_val)
+            test_dis_cost_val_summary = tf.Summary(
+                value=[tf.Summary.Value(tag="test_dis_cost", simple_value=dis_cost_val)])
+            training_writer.add_summary(test_dis_cost_val_summary,
+                                        tf.train.global_step(sess, global_step))
+            test_dis_total_cost_val_summary = tf.Summary(
+                value=[tf.Summary.Value(tag="test_dis_total_cost", simple_value=dis_total_cost_val)])
+            training_writer.add_summary(test_dis_total_cost_val_summary,
+                                        tf.train.global_step(sess, global_step))
+            test_accuracy_val_summary = tf.Summary(
+                value=[tf.Summary.Value(tag="test_accuracy", simple_value=accuracy_val)])
+            training_writer.add_summary(test_accuracy_val_summary,
+                                        tf.train.global_step(sess, global_step))
+            # except KeyboardInterrupt
 
     with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
         json.dump(dict(conf), file)
