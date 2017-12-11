@@ -153,6 +153,49 @@ class VDSN_FACE(object):
         self.gan_discrim_bFC = bias_variable([dim_FC], name='gan_dis_bFC')
         self.gan_discrim_bFC1 = bias_variable([dim_y+1], name='gan_dis_bFC1')
 
+    def buildClassModel(self, gen_regularizer_weight=1):
+        '''
+        Y for class label
+        '''
+        Y_left = tf.placeholder(tf.float32, [None, self.dim_y])
+        Y_right = tf.placeholder(tf.float32, [None, self.dim_y])
+
+        image_real_left = tf.placeholder(tf.float32, [None] + self.image_shape)
+        image_real_right = tf.placeholder(tf.float32, [None] + self.image_shape)
+
+        F_I_left, F_V_left = self.encoder(image_real_left, reuse=False)
+        F_I_right, F_V_right = self.encoder(image_real_right, reuse=True)
+
+        Y_cla_logits_left = self.classifier(F_I_left, reuse=False)
+        Y_cla_logits_right = self.classifier(F_I_right, reuse=True)
+
+        cla_correct_prediction_left = tf.equal(tf.argmax(Y_cla_logits_left, 1), tf.argmax(Y_left, 1))
+        cla_accuracy_left = tf.reduce_mean(tf.cast(cla_correct_prediction_left, tf.float32))
+
+        cla_correct_prediction_right = tf.equal(tf.argmax(Y_cla_logits_right, 1), tf.argmax(Y_right, 1))
+        cla_accuracy_right = tf.reduce_mean(tf.cast(cla_correct_prediction_right, tf.float32))
+
+        classifier_vars = filter(lambda x: x.name.startswith('classif'), tf.trainable_variables())
+        encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
+
+        cla_cost_left = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(labels=Y_left, logits=Y_cla_logits_left))
+        cla_cost_right = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(labels=Y_right, logits=Y_cla_logits_right))
+
+        regularizer = tf.contrib.layers.l2_regularizer(0.1)
+        classifier_regularization_loss = tf.contrib.layers.apply_regularization(
+            regularizer, weights_list=encoder_vars + classifier_vars)
+
+        cla_accuracy = (cla_accuracy_left + cla_accuracy_right) / 2
+        cla_cost = (cla_cost_left + cla_cost_right) / 2
+
+        total_cost = cla_cost + gen_regularizer_weight * classifier_regularization_loss
+
+        return Y_left, Y_right, image_real_left, image_real_right, total_cost, cla_accuracy
+
+
+
     def build_model(self, gen_disentangle_weight=1, gen_regularizer_weight=1,
                     dis_regularizer_weight=1, gen_cla_weight=1):
 

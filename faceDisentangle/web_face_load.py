@@ -109,8 +109,8 @@ def tensor_decode_all(filePath):
 
 
 if __name__ == '__main__':
-    # save_data2record('train.tfrecords', '../data/image_sample/*')
+    save_data2record('train.tfrecords', '../data/image_sample/*')
     # tensor_decode(8, 2)
-    img_list, label_list = tensor_decode_all('train.tfrecords')
-    img_list.astype(dtype=np.float32)
-    print img_list, label_list
+    # img_list, label_list = tensor_decode_all('train.tfrecords')
+    # img_list.astype(dtype=np.float32)
+    # print img_list, label_list
