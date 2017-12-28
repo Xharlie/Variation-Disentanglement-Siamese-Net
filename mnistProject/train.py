@@ -247,6 +247,11 @@ save_path=""
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
+def resetIndex():
+    start = 0
+    end = args.batch_size
+    return start, end
+
 with tf.Session(config=config) as sess:
     try:
         sess.run(tf.global_variables_initializer())
@@ -263,42 +268,55 @@ with tf.Session(config=config) as sess:
             pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
             pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
 
-        for epoch in range(n_epochs):
-            index_disentangle = np.arange(len(trY))
-            np.random.shuffle(index_disentangle)
-            index_reconst = np.arange(len(trY))
-            np.random.shuffle(index_reconst)
-            index_gan = np.arange(len(trY))
-            np.random.shuffle(index_gan)
+        index_disentangle = np.arange(len(trY))
+        index_reconst = np.arange(len(trY))
+        index_gan = np.arange(len(trY))
 
-            indexTable = [[] for i in range(10)]
-            for index in range(len(trY)):
-                indexTable[trY[index]].append(index)
+        indexTable = [[] for i in range(10)]
+        for index in range(len(trY)):
+            indexTable[trY[index]].append(index)
 
-            for start, end in zip(
-                    range(0, len(trY), batch_size),
-                    range(batch_size, len(trY), batch_size)
-                    ):
-                Xs_left_disentangle = trX[index_disentangle[start:end]].reshape([-1, 28, 28, 1]) / 255.
-                Ys_left_disentangle = OneHot(trY[index_disentangle[start:end]], 10)
-                Xs_left_reconst = trX[index_reconst[start:end]].reshape([-1, 28, 28, 1]) / 255.
-                Ys_left_reconst = OneHot(trY[index_reconst[start:end]], 10)
-                Xs_left_gan = trX[index_gan[start:end]].reshape([-1, 28, 28, 1]) / 255.
-                Ys_left_gan = OneHot(trY[index_gan[start:end]], 10)
-                Xs_right=[]
-                Ys_right=[]
+        start_disentangle, end_disentangle = resetIndex()
+        start_reconst, end_reconst = resetIndex()
+        start_gan, end_gan = resetIndex()
+        np.random.shuffle(index_disentangle)
+        np.random.shuffle(index_reconst)
+        np.random.shuffle(index_gan)
+
+        epoch = 0
+        while epoch < n_epochs:
+            while end_reconst <= len(trY):
+                print epoch
+                if end_disentangle > len(trY):
+                    np.random.shuffle(index_disentangle)
+                    start_disentangle, end_disentangle = resetIndex()
+                if end_gan > len(trY):
+                    np.random.shuffle(index_gan)
+                    start_gan, end_gan = resetIndex()
+
+                Xs_left_disentangle = trX[index_disentangle[start_disentangle:end_disentangle]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_disentangle = OneHot(trY[index_disentangle[start_disentangle:end_disentangle]], 10)
+                Xs_left_reconst = trX[index_reconst[start_reconst:end_reconst]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_reconst = OneHot(trY[index_reconst[start_reconst:end_reconst]], 10)
+                Xs_left_gan = trX[index_gan[start_gan:end_gan]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_gan = OneHot(trY[index_gan[start_gan:end_gan]], 10)
+                Xs_right = []
+                Ys_right = []
+
                 modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
+
                 if modulus < args.recon_series:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX,
-                                                         trY[index_reconst[start:end]], indexTable)
+                    Xs_right, Ys_right = randomPickRight(start_reconst, end_reconst, trX,
+                                                         trY[index_reconst[start_reconst:end_reconst]], indexTable)
                     Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
                 elif modulus < args.recon_series + args.dis_series:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX,
-                                                         trY[index_disentangle[start:end]], indexTable)
+                    Xs_right, Ys_right = randomPickRight(start_disentangle, end_disentangle, trX,
+                                                         trY[index_disentangle[start_disentangle:end_disentangle]],
+                                                         indexTable)
                     Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
                 else:
-                    Xs_right, Ys_right = randomPickRight(start, end, trX,
-                                                         trY[index_disentangle[start:end]], indexTable,
+                    Xs_right, Ys_right = randomPickRight(start_gan, end_gan, trX,
+                                                         trY[index_disentangle[start_gan:end_gan]], indexTable,
                                                          feature="F_I_F_D_F_V")
                     Ys_right = OneHot(Ys_right, 10)
                     Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
@@ -315,6 +333,8 @@ with tf.Session(config=config) as sess:
                                 image_tf_real_left: Xs_left_reconst,
                                 image_tf_real_right: Xs_right
                             })
+                    start_reconst += batch_size
+                    end_reconst += batch_size
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
                     print("=========== updating G ==========")
                     print("iteration:", iterations)
@@ -345,6 +365,8 @@ with tf.Session(config=config) as sess:
                                 image_tf_real_right: Xs_right
                                 })
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                    start_disentangle += batch_size
+                    end_disentangle += batch_size
                     print("=========== updating D ==========")
                     print("iteration:", iterations)
                     print("discriminator loss:", dis_cost_val)
@@ -404,6 +426,8 @@ with tf.Session(config=config) as sess:
                             image_tf_real_left: Xs_left_gan,
                             image_tf_real_right: Xs_right
                     })
+                    start_gan += batch_size
+                    end_gan += batch_size
                     print("=========== updating gan G ==========")
                     print("iteration:", iterations)
                     print("gan gen loss:", gan_gen_cost_val)
@@ -424,6 +448,11 @@ with tf.Session(config=config) as sess:
                 if np.mod(iterations, args.save_step) == 0 and iterations >= args.save_step:
                     save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
                     print("Model saved in file: %s" % save_path)
+
+            np.random.shuffle(index_reconst)
+            start_reconst, end_reconst = resetIndex()
+            epoch += 1
+
         # Save the variables to disk.
         save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
         print("Model saved in file: %s" % save_path)
@@ -468,10 +497,10 @@ if args.validate_disentanglement:
     tf.reset_default_graph()
     F_V_classification_conf = copy.deepcopy(F_classification_conf)
     F_V_classification_conf["feature_selection"] = "F_V"
-    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY)
+    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY,True)
 
 if args.validate_classification:
     tf.reset_default_graph()
     F_I_classification_conf = copy.deepcopy(F_classification_conf)
     F_I_classification_conf["feature_selection"] = "F_I"
-    classification_validation.validate_F_classification(F_I_classification_conf,trX,trY,vaX,vaY,teX,teY)
+    classification_validation.validate_F_classification(F_I_classification_conf,trX,trY,vaX,vaY,teX,teY,True)

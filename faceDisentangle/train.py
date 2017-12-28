@@ -248,7 +248,8 @@ with tf.control_dependencies(tf.get_collection(ADV_BATCH_NORM_OPS)):
 
 with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
     train_op_gan_gen = tf.train.AdamOptimizer(
-        dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
+        dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf,
+                                               var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
 
 with tf.control_dependencies(tf.get_collection(DIS_BATCH_NORM_OPS)):
     train_op_gan_discrim = tf.train.AdamOptimizer(

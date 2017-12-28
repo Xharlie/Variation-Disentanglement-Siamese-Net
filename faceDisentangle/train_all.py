@@ -136,6 +136,9 @@ parser.add_argument("--F_V_validation_learning_rate", nargs='?', type=float, def
 parser.add_argument("--F_V_validation_test_batch_size", nargs='?', type=int, default=1000,
                     help="F V validation's test_batch_size")
 
+parser.add_argument("--classification_only", action="store_true",
+                    help="Run classification on the face task.")
+
 args = parser.parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
@@ -212,49 +215,68 @@ VDSN_model = VDSN_FACE(
                 disentangle_obj_func='hybrid'
                 )
 
-Y_left_tf, Y_right_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
+if args.classification_only:
+    Y_left_tf, Y_right_tf, image_tf_real_left, image_tf_real_right, total_cost_tf, cla_accuracy_tf \
+        = VDSN_model.buildClassModel(gen_regularizer_weight)
+    # saver to save trained model to disk
+    saver = tf.train.Saver(max_to_keep=10)
+    # global_step to record steps in total
+    global_step = tf.Variable(0, trainable=False)
+    gen_learning_rate = tf.train.exponential_decay(args.gen_start_learning_rate, global_step,
+                                                   args.gen_decay_step, args.gen_decay_rate, staircase=True)
+
+    cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
+    # include en_* and encoder_* W and b,
+    encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
+
+    with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
+        train_op_gen = tf.train.AdamOptimizer(
+            gen_learning_rate, beta1=0.5).minimize(
+            total_cost_tf, var_list=encoder_vars+cla_vars, global_step=global_step)
+else:
+    Y_left_tf, Y_right_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf, \
     gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
     image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf, \
-    F_I_left_tf, F_V_left_tf, gan_gen_cost_tf, gan_dis_cost_tf, gan_total_cost_tf\
-    = VDSN_model.build_model(
-    gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
+    F_I_left_tf, F_V_left_tf, gan_gen_cost_tf, gan_dis_cost_tf, gan_total_cost_tf \
+        = VDSN_model.build_model(
+        gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
+    # saver to save trained model to disk
+    saver = tf.train.Saver(max_to_keep=10)
+    # global_step to record steps in total
+    global_step = tf.Variable(0, trainable=False)
+    gen_learning_rate = tf.train.exponential_decay(args.gen_start_learning_rate, global_step,
+                                                   args.gen_decay_step, args.gen_decay_rate, staircase=True)
+    dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, global_step,
+                                                   args.dis_decay_step, args.dis_decay_rate, staircase=True)
+    gan_learning_rate = tf.train.exponential_decay(args.gan_start_learning_rate, global_step,
+                                                   args.gan_decay_step, args.gan_decay_rate, staircase=True)
 
-# saver to save trained model to disk
-saver = tf.train.Saver(max_to_keep=10)
-# global_step to record steps in total
-global_step = tf.Variable(0, trainable=False)
-gen_learning_rate = tf.train.exponential_decay(args.gen_start_learning_rate, global_step,
-                                               args.gen_decay_step, args.gen_decay_rate, staircase=True)
-dis_learning_rate = tf.train.exponential_decay(args.dis_start_learning_rate, global_step,
-                                               args.dis_decay_step, args.dis_decay_rate, staircase=True)
-gan_learning_rate = tf.train.exponential_decay(args.gan_start_learning_rate, global_step,
-                                               args.gan_decay_step, args.gan_decay_rate, staircase=True)
+    dis_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
+    gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
+    cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
+    gan_dis_vars = filter(lambda x: x.name.startswith('gan'), tf.trainable_variables())
 
-dis_vars = filter(lambda x: x.name.startswith('dis'), tf.trainable_variables())
-gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
-cla_vars = filter(lambda x: x.name.startswith('cla'), tf.trainable_variables())
-gan_dis_vars = filter(lambda x: x.name.startswith('gan'), tf.trainable_variables())
+    # include en_* and encoder_* W and b,
+    encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
 
-# include en_* and encoder_* W and b,
-encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
+    with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
+        train_op_gen = tf.train.AdamOptimizer(
+            gen_learning_rate, beta1=0.5).minimize(
+            gen_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
 
-with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
-    train_op_gen = tf.train.AdamOptimizer(
-        gen_learning_rate, beta1=0.5).minimize(
-        gen_total_cost_tf, var_list=gen_vars + encoder_vars + cla_vars, global_step=global_step)
+    with tf.control_dependencies(tf.get_collection(ADV_BATCH_NORM_OPS)):
+        train_op_discrim = tf.train.AdamOptimizer(
+            dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
 
-with tf.control_dependencies(tf.get_collection(ADV_BATCH_NORM_OPS)):
-    train_op_discrim = tf.train.AdamOptimizer(
-        dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
+    with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
+        train_op_gan_gen = tf.train.AdamOptimizer(
+            dis_learning_rate, beta1=0.5).\
+            minimize(dis_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
 
-with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
-    train_op_gan_gen = tf.train.AdamOptimizer(
-        dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
-
-with tf.control_dependencies(tf.get_collection(DIS_BATCH_NORM_OPS)):
-    train_op_gan_discrim = tf.train.AdamOptimizer(
-        gan_learning_rate, beta1=0.5).minimize(
-        gan_dis_cost_tf, var_list=gan_dis_vars)
+    with tf.control_dependencies(tf.get_collection(DIS_BATCH_NORM_OPS)):
+        train_op_gan_discrim = tf.train.AdamOptimizer(
+            gan_learning_rate, beta1=0.5).minimize(
+            gan_dis_cost_tf, var_list=gan_dis_vars)
 
 iterations = 0
 save_path=""
@@ -262,6 +284,11 @@ save_path=""
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
+
+def resetIndex():
+    start = 0
+    end = args.batch_size
+    return start, end
 
 with tf.Session(config=config) as sess:
     try:
@@ -276,43 +303,104 @@ with tf.Session(config=config) as sess:
             # Create a saver. include gen_vars and encoder_vars
             saver.restore(sess, args.pretrain_model)
         elif (len(args.pretrain_model_wo_lr) > 0):
-            # Create a saver. include gen_vars and encoder_vars
-            pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
-            pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
+            if args.classification_only:
+                pretrain_saver = tf.train.Saver(encoder_vars + cla_vars)
+                pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
+            else:
+                # Create a saver. include gen_vars and encoder_vars
+                pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + dis_vars + cla_vars)
+                pretrain_saver.restore(sess, args.pretrain_model_wo_lr)
 
-        for epoch in range(n_epochs):
-            index = np.arange(len(trY))
-            np.random.shuffle(index)
-            trX = trX[index]
-            trY = trY[index]
+        index_disentangle = np.arange(len(trY))
+        index_reconst = np.arange(len(trY))
+        index_gan = np.arange(len(trY))
 
-            indexTable = [[] for i in range(dim_y)]
-            for index in range(len(trY)):
-                indexTable[trY[index]].append(index)
+        indexTable = [[] for i in range(dim_y)]
+        for index in range(len(trY)):
+            indexTable[trY[index]].append(index)
 
-            for start, end in zip(
-                    range(0, len(trY), batch_size),
-                    range(batch_size, len(trY), batch_size)
-            ):
-                print "Throw a batch of images"
-                Xs_left = trX[start:end].reshape([-1, 96, 96, 3])
-                Ys_left = OneHot(trY[start:end], dim_y)
-                Xs_right = []
-                Ys_right = []
+        start_disentangle, end_disentangle = resetIndex()
+        start_reconst, end_reconst = resetIndex()
+        start_gan, end_gan = resetIndex()
+        np.random.shuffle(index_disentangle)
+        np.random.shuffle(index_reconst)
+        np.random.shuffle(index_gan)
+
+        epoch = 0
+
+        while epoch < n_epochs:
+            while end_reconst <= len(trY):
+                print epoch
+                if end_disentangle > len(trY):
+                    np.random.shuffle(index_disentangle)
+                    start_disentangle, end_disentangle = resetIndex()
+                if end_gan > len(trY):
+                    np.random.shuffle(index_gan)
+                    start_gan, end_gan = resetIndex()
+
                 modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
 
-                if modulus < args.dis_series + args.recon_series:
-                    Xs_right, Ys_right_label = randomPickRight(start, end, trX, trY, indexTable, feature="F_I_F_V",
-                                                         dim=dim_y)
+                if args.classification_only:
+                    Xs_left_reconst = normalizaion(trX[index_disentangle[start_reconst:end_reconst]].reshape(
+                        [-1, 96, 96, 3]).astype(dtype=np.float32))
+                    Ys_left_reconst = OneHot(trY[index_reconst[start_reconst:end_reconst]], dim_y)
+                    Xs_right, Ys_right_label = randomPickRight(start_reconst, end_reconst, trX, trY,
+                                                               indexTable, feature="F_I_F_V", dim=dim_y)
                     Xs_right = Xs_right.reshape([-1, 96, 96, 3])
                 else:
-                    Xs_right, Ys_right_label = randomPickRight(start, end, trX, trY, indexTable,
-                                                         feature="F_I_F_D_F_V", dim=dim_y)
-                    Ys_right = OneHot(Ys_right_label, dim_y)
-                    Xs_right = Xs_right.reshape([-1, 96, 96, 3])
+                    if modulus < args.recon_series or args.classification_only:
+                        Xs_left_reconst = normalizaion(trX[index_disentangle[start_reconst:end_reconst]].reshape(
+                            [-1, 96, 96, 3]).astype(dtype=np.float32))
+                        Ys_left_reconst = OneHot(trY[index_reconst[start_reconst:end_reconst]], dim_y)
+                        Xs_right, Ys_right_label = randomPickRight(start_reconst, end_reconst, trX, trY,
+                                                                   indexTable, feature="F_I_F_V", dim=dim_y)
+                        Xs_right = Xs_right.reshape([-1, 96, 96, 3])
+                    elif modulus < args.recon_series + args.dis_series:
+                        Xs_left_disentangle = normalizaion(
+                            trX[index_disentangle[start_disentangle:end_disentangle]].reshape(
+                                [-1, 96, 96, 3]).astype(dtype=np.float32))
+                        Ys_left_disentangle = OneHot(trY[index_disentangle[start_disentangle:end_disentangle]], dim_y)
+                        Xs_right, Ys_right_label = randomPickRight(start_disentangle, end_disentangle, trX, trY,
+                                                                   indexTable, feature="F_I_F_V", dim=dim_y)
+                        Ys_right = OneHot(Ys_right_label, dim_y)
+                        Xs_right = Xs_right.reshape([-1, 96, 96, 3])
+                    else:
+                        Xs_left_gan = normalizaion(trX[index_disentangle[start_gan:end_gan]].reshape(
+                            [-1, 96, 96, 3]).astype(dtype=np.float32))
+                        Ys_left_gan = OneHot(trY[index_gan[start_gan:end_gan]], dim_y)
+                        Xs_right, Ys_right = randomPickRight(start_gan, end_gan, trX, trY, indexTable,
+                                                             feature="F_I_F_D_F_V", dim=dim_y)
+                        Ys_right = OneHot(Ys_right, dim_y)
+                        Xs_right = Xs_right.reshape([-1, 96, 96, 3])
 
-                Xs_left = normalizaion(Xs_left.astype(dtype=np.float32))
                 Xs_right = normalizaion(Xs_right.astype(dtype=np.float32))
+                print type(Xs_right)
+                print Xs_right.shape
+                if args.classification_only:
+                    print "Prepared to do classification"
+                    _, total_cost, cla_accuracy \
+                        = sess.run(
+                        [train_op_gen, total_cost_tf, cla_accuracy_tf],
+                        feed_dict={
+                            Y_left_tf: Ys_left_reconst,
+                            Y_right_tf: Ys_left_reconst,
+                            image_tf_real_left: Xs_left_reconst,
+                            image_tf_real_right: Xs_right
+                        })
+
+                    start_reconst += batch_size
+                    end_reconst += batch_size
+
+                    #training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                    print("=========== updating G ==========")
+                    print("iteration:", iterations)
+                    print("classification cost:", total_cost)
+                    print("classification accuracy:", cla_accuracy)
+                    print "Finished generating"
+                    sys.stdout.flush()
+                    iterations += 1
+                    continue
+
                 if modulus < args.recon_series:
                     print "Prepared to launch training generating"
                     _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
@@ -322,11 +410,15 @@ with tf.Session(config=config) as sess:
                          gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
                          dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
                         feed_dict={
-                            Y_left_tf: Ys_left,
-                            Y_right_tf: Ys_left,
-                            image_tf_real_left: Xs_left,
+                            Y_left_tf: Ys_left_reconst,
+                            Y_right_tf: Ys_left_reconst,
+                            image_tf_real_left: Xs_left_reconst,
                             image_tf_real_right: Xs_right
                         })
+
+                    start_reconst += batch_size
+                    end_reconst += batch_size
+
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
                     print("=========== updating G ==========")
                     print("iteration:", iterations)
@@ -348,11 +440,13 @@ with tf.Session(config=config) as sess:
                         [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf,
                          dis_prediction_tf_left, dis_prediction_tf_right],
                         feed_dict={
-                            Y_left_tf: Ys_left,
-                            Y_right_tf: Ys_left,
-                            image_tf_real_left: Xs_left,
+                            Y_left_tf: Ys_left_disentangle,
+                            Y_right_tf: Ys_left_disentangle,
+                            image_tf_real_left: Xs_left_disentangle,
                             image_tf_real_right: Xs_right
                         })
+                    start_disentangle += batch_size
+                    end_disentangle += batch_size
                     training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
                     print("=========== updating D ==========")
                     print("iteration:", iterations)
@@ -394,9 +488,9 @@ with tf.Session(config=config) as sess:
                         = sess.run(
                         [train_op_gan_discrim, merged_summary, gan_dis_cost_tf],
                         feed_dict={
-                            Y_left_tf: Ys_left,
+                            Y_left_tf: Ys_left_gan,
                             Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left,
+                            image_tf_real_left: Xs_left_gan,
                             image_tf_real_right: Xs_right
                         }
                     )
@@ -414,11 +508,13 @@ with tf.Session(config=config) as sess:
                          gen_disentangle_cost_tf, gen_cla_cost_tf, gan_total_cost_tf,
                          dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
                         feed_dict={
-                            Y_left_tf: Ys_left,
+                            Y_left_tf: Ys_left_gan,
                             Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left,
+                            image_tf_real_left: Xs_left_gan,
                             image_tf_real_right: Xs_right
                         })
+                    start_gan += batch_size
+                    end_gan += batch_size
                     print("=========== updating gan G ==========")
                     print("iteration:", iterations)
                     print("gan gen loss:", gan_gen_cost_val)
@@ -436,6 +532,9 @@ with tf.Session(config=config) as sess:
                 if iterations % 10000 == 0:
                     save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
                     print("Model saved in file: %s" % save_path)
+            np.random.shuffle(index_reconst)
+            start_reconst, end_reconst = resetIndex()
+            epoch += 1
 
     except KeyboardInterrupt:
         print("Manual interrupt occurred.")
