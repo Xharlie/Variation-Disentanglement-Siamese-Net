@@ -216,7 +216,8 @@ VDSN_model = VDSN_FACE(
                 )
 
 if args.classification_only:
-    Y_left_tf, Y_right_tf, image_tf_real_left, image_tf_real_right, total_cost_tf, cla_accuracy_tf \
+    Y_left_tf, Y_right_tf, image_tf_real_left, image_tf_real_right, \
+        total_cost_tf, cla_accuracy_tf, y_predict_left_tf, y_predict_right_tf \
         = VDSN_model.buildClassModel(gen_regularizer_weight)
     # saver to save trained model to disk
     saver = tf.train.Saver(max_to_keep=10)
@@ -341,7 +342,7 @@ with tf.Session(config=config) as sess:
                 modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
 
                 if args.classification_only:
-                    Xs_left_reconst = normalizaion(trX[index_disentangle[start_reconst:end_reconst]].reshape(
+                    Xs_left_reconst = normalizaion(trX[index_reconst[start_reconst:end_reconst]].reshape(
                         [-1, 96, 96, 3]).astype(dtype=np.float32))
                     Ys_left_reconst = OneHot(trY[index_reconst[start_reconst:end_reconst]], dim_y)
                     Xs_right, Ys_right_label = randomPickRight(start_reconst, end_reconst, trX, trY,
@@ -365,7 +366,7 @@ with tf.Session(config=config) as sess:
                         Ys_right = OneHot(Ys_right_label, dim_y)
                         Xs_right = Xs_right.reshape([-1, 96, 96, 3])
                     else:
-                        Xs_left_gan = normalizaion(trX[index_disentangle[start_gan:end_gan]].reshape(
+                        Xs_left_gan = normalizaion(trX[index_gan[start_gan:end_gan]].reshape(
                             [-1, 96, 96, 3]).astype(dtype=np.float32))
                         Ys_left_gan = OneHot(trY[index_gan[start_gan:end_gan]], dim_y)
                         Xs_right, Ys_right = randomPickRight(start_gan, end_gan, trX, trY, indexTable,
@@ -378,9 +379,9 @@ with tf.Session(config=config) as sess:
                 print Xs_right.shape
                 if args.classification_only:
                     print "Prepared to do classification"
-                    _, total_cost, cla_accuracy \
+                    _, total_cost, cla_accuracy, y_predict_left, y_predict_right \
                         = sess.run(
-                        [train_op_gen, total_cost_tf, cla_accuracy_tf],
+                        [train_op_gen, total_cost_tf, cla_accuracy_tf, y_predict_left_tf, y_predict_right_tf],
                         feed_dict={
                             Y_left_tf: Ys_left_reconst,
                             Y_right_tf: Ys_left_reconst,
@@ -392,11 +393,13 @@ with tf.Session(config=config) as sess:
                     end_reconst += batch_size
 
                     #training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-                    print("=========== updating G ==========")
+                    print("=========== updating Classifier ==========")
                     print("iteration:", iterations)
                     print("classification cost:", total_cost)
                     print("classification accuracy:", cla_accuracy)
-                    print "Finished generating"
+                    print(y_predict_left)
+                    print(Ys_left_reconst)
+                    print "Finished classifying"
                     sys.stdout.flush()
                     iterations += 1
                     continue
