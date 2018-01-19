@@ -32,6 +32,11 @@ def lrelu(X, leak=0.2):
     f2 = 0.5 * (1 - leak)
     return f1 * X + f2 * tf.abs(X)
 
+def selu(x):
+   alpha = 1.6732632423543772848170429916717
+   scale = 1.0507009873554804934193349852946
+   return scale*tf.where(x>=0.0, x, alpha*tf.nn.elu(x))
+
 def bce(o, t):
     o = tf.clip_by_value(o, 1e-7, 1. - 1e-7)
     return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=o, labels=t))
@@ -56,7 +61,8 @@ def _get_variable(name,
                            regularizer=regularizer,
                            trainable=trainable)
 
-def batchnormalize(x, name, train=True, reuse=False):
+
+def batchnormalize(x, name, train=True, reuse=False, valid = True, soft = False):
     phase = 'gen'
     if name.startswith('dis'):
         phase = 'adv'
@@ -83,7 +89,9 @@ def batchnormalize(x, name, train=True, reuse=False):
                                         params_shape,
                                         initializer=tf.ones_initializer,
                                         trainable=False)
-
+        # don't use batchnorm at all
+        if not valid:
+            return x
         # These ops will only be preformed when training.
         mean, variance = tf.nn.moments(x, axis)
         update_moving_mean = moving_averages.assign_moving_average(moving_mean,
@@ -93,7 +101,7 @@ def batchnormalize(x, name, train=True, reuse=False):
         tf.add_to_collection(phase+BATCH_NORM_OPS_BASE, update_moving_mean)
         tf.add_to_collection(phase+BATCH_NORM_OPS_BASE, update_moving_variance)
 
-        if not train:
+        if (not train) or soft:
             mean, variance = moving_mean, moving_variance
 
         x = tf.nn.batch_normalization(x, mean, variance, beta, gamma, 0.001)

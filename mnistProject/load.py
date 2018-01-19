@@ -4,7 +4,7 @@ sys.path.append('..')
 import numpy as np
 import os
 
-data_dir = '../data/'
+data_dir = '../../data/'
 def mnist():
     fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
@@ -35,9 +35,9 @@ def mnist_with_valid_set():
     trX = trX[train_inds]
     trY = trY[train_inds]
     #trX, trY = shuffle(trX, trY)
-    vaX = trX[50000:]
-    vaY = trY[50000:]
-    trX = trX[:50000]
-    trY = trY[:50000]
+    vaX = trX[59000:]
+    vaY = trY[59000:]
+    trX = trX[:59000]
+    trY = trY[:59000]
 
     return trX, vaX, teX, trY, vaY, teY

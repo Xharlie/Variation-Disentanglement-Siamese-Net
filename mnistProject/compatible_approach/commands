@@ -1,0 +1,11 @@
+
+---------------------- classification validation -------------------------
+python -u classification_validation.py --not_split_encoder --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/model_treasury/2017-11-23-16-18-17/model.ckpt --feature_selection F_I --F_validation_test_batch_size 128
+
+python -u classification_validation.py --not_split_encoder --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/model_treasury/2017-12-29-21-45-30/model.ckpt --feature_selection F_V --F_validation_test_batch_size 128
+
+----------------- dynamic cost function + split encoder + less summary------------------------
+
+
+
+nohup python -u train.py --avg_momentum 0.05 --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_train_bntrue_splitencoder &

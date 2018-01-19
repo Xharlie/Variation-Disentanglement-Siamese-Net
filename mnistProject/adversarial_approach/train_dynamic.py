@@ -1,5 +1,3 @@
-import os
-import numpy as np
 from model import *
 from util import *
 from neural_helper import *
@@ -8,7 +6,6 @@ from load import mnist_with_valid_set
 from time import localtime, strftime
 import argparse
 import classification_validation
-import reconst_vali
 import json
 import math
 import copy
@@ -74,7 +71,7 @@ parser.add_argument("--dis_series", nargs='?', type=int, default=10,
 parser.add_argument("--gan_series", nargs='?', type=int, default=1,
                     help="how many time the generator with gan task can train consecutively")
 
-parser.add_argument("--drawing_step", nargs='?', type=int, default=200000,
+parser.add_argument("--drawing_step", nargs='?', type=int, default=100000,
                     help="how many steps to draw a comparision pic")
 
 parser.add_argument("--save_step", nargs='?', type=int, default=200000,
@@ -110,6 +107,9 @@ parser.add_argument("--model_dir_parent", nargs='?', type=str, default='model_tr
 parser.add_argument("--pic_dir_parent", nargs='?', type=str, default='vis/',
                     help="root dir to save pic")
 
+parser.add_argument("--recon_img_not_tensorboard", action="store_true",
+                    help="save validation reconstruction image locally not tensorboard")
+
 parser.add_argument("--gpu_ind", nargs='?', type=str, default='0',
                     help="which gpu to use")
 
@@ -121,6 +121,15 @@ parser.add_argument("--debug", action="store_true",
 
 parser.add_argument("--train_bn", action="store_true",
                     help="train bn's gamma and beta")
+
+parser.add_argument("--soft_bn", action="store_true",
+                    help="use moving in training")
+
+parser.add_argument("--not_split_encoder", action="store_true",
+                    help="use moving in training")
+
+parser.add_argument("--summary_update_step", nargs='?', type=int, default=10,
+                    help="every how many steps we should update summary")
 
 # >==================  F_V_validation args =======================<
 
@@ -185,13 +194,18 @@ VDSN_model = VDSN(
         dim_W2=dim_W2,
         dim_W3=dim_W3,
         dim_F_I=dim_F_I,
-        disentangle_obj_func=args.disentangle_obj_func
+        disentangle_obj_func=args.disentangle_obj_func,
+        train_bn= args.train_bn,
+        soft_bn= args.soft_bn,
+        split_encoder = (not args.not_split_encoder)
 )
 
 Y_left_tf, Y_right_tf, image_tf_real_left, image_tf_real_right, g_recon_cost_tf, gen_disentangle_cost_tf, gen_cla_cost_tf,\
     gen_total_cost_tf, dis_cost_tf, dis_total_cost_tf, \
     image_gen_left, image_gen_right, dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf, \
-    F_I_left_tf, F_V_left_tf, gan_gen_cost_tf, gan_dis_cost_tf, gan_total_cost_tf\
+    F_I_left_tf, F_V_left_tf, gan_gen_cost_tf, gan_dis_cost_tf, gan_total_cost_tf, val_recon_img_tf, \
+    summary_merge_scalar, summary_gen_merge_scalar, summary_adv_merge_scalar, \
+               summary_gan_gen_merge_scalar, summary_gan_dis_merge_scalar, summary_merge_img \
     = VDSN_model.build_model(
     gen_disentangle_weight, gen_regularizer_weight, dis_regularizer_weight, gen_cla_weight)
 
@@ -228,12 +242,12 @@ with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
 
 with tf.control_dependencies(tf.get_collection(ADV_BATCH_NORM_OPS)):
     train_op_discrim = tf.train.AdamOptimizer(
-        dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars, global_step=global_step)
+        dis_learning_rate, beta1=0.5).minimize(dis_total_cost_tf, var_list=dis_vars)
 
 with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
     train_op_gan_gen = tf.train.AdamOptimizer(
         gan_learning_rate, beta1=0.5).minimize(
-        gan_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
+        gan_total_cost_tf, var_list=gen_vars+encoder_vars+cla_vars)
 
 with tf.control_dependencies(tf.get_collection(DIS_BATCH_NORM_OPS)):
     # not update global step since we considered gan as a whole step
@@ -258,7 +272,7 @@ with tf.Session(config=config) as sess:
         # writer for tensorboard summary
         training_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
         # test_writer = tf.summary.FileWriter(training_logs_dir, sess.graph)
-        merged_summary = tf.summary.merge_all()
+
 
         if (len(args.pretrain_model)>0):
             # Create a saver. include gen_vars and encoder_vars
@@ -272,10 +286,12 @@ with tf.Session(config=config) as sess:
         index_reconst = np.arange(len(trY))
         index_gan = np.arange(len(trY))
 
-        indexTable = [[] for i in range(10)]
+        indexTable = [[] for i in range(dim_y)]
         for index in range(len(trY)):
             indexTable[trY[index]].append(index)
-
+        indexTableVal = [[] for i in range(10)]
+        for index in range(len(vaY)):
+            indexTableVal[vaY[index]].append(index)
         start_disentangle, end_disentangle = resetIndex()
         start_reconst, end_reconst = resetIndex()
         start_gan, end_gan = resetIndex()
@@ -283,184 +299,217 @@ with tf.Session(config=config) as sess:
         np.random.shuffle(index_reconst)
         np.random.shuffle(index_gan)
 
+        def draw_img():
+            corrRightVal, _ = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
+            corrRightVal = corrRightVal.reshape([-1, 28, 28, 1]) / 255
+            image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
+            VDSN_model.is_training = False
+            generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
+                [image_gen_left, F_V_left_tf, F_I_left_tf],
+                feed_dict={
+                    image_tf_real_left: image_real_left,
+                    image_tf_real_right: corrRightVal
+                })
+            # since 16 * 8  = batch size * 2
+            if args.recon_img_not_tensorboard == True:
+                save_visualization_triplet(corrRightVal,image_real_left,
+                                           generated_samples_left,
+                                           (int(math.ceil(batch_size ** (.5))),
+                                            int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
+                                           save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(
+                                               iterations))
+            else:
+                img = get_visualization_triplet(corrRightVal,image_real_left,
+                                                generated_samples_left,
+                                                (int(math.ceil(batch_size ** (.5))),
+                                                 int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))))
+                summary = sess.run(summary_merge_img, feed_dict={
+                    val_recon_img_tf: np.expand_dims(img, axis=0)})
+                training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+            VDSN_model.is_training = True
+
+        draw_flag=0
         epoch = 0
+        save_step_acc = args.save_step
         while epoch < n_epochs:
-            while end_reconst <= len(trY):
-                print epoch
+            recon_cum = 1
+            while recon_cum <= args.recon_series : #or (dis_prediction_val_left[0] >= 0.12 or gen_recon_cost_val >= 0.0026):
+                Xs_left_reconst = trX[index_reconst[start_reconst:end_reconst]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_reconst = OneHot(trY[index_reconst[start_reconst:end_reconst]], 10)
+                Xs_right, Ys_right = randomPickRight(start_reconst, end_reconst, trX,
+                                                     trY[index_reconst[start_reconst:end_reconst]], indexTable)
+                Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
+
+                _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
+                dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
+                    = sess.run(
+                    [train_op_gen, summary_gen_merge_scalar, g_recon_cost_tf,
+                     gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
+                     dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
+                    feed_dict={
+                        Y_left_tf: Ys_left_reconst,
+                        Y_right_tf: Ys_left_reconst,
+                        image_tf_real_left: Xs_left_reconst,
+                        image_tf_real_right: Xs_right
+                    })
+                start_reconst += batch_size
+                end_reconst += batch_size
+                # print "global_step", tf.train.global_step(sess, global_step)
+                if np.mod(tf.train.global_step(sess, global_step), args.summary_update_step) == 0:
+                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                print("=========== updating G ==========")
+                print("iteration and reconcum:", iterations, recon_cum)
+                print("gen reconstruction loss:", gen_recon_cost_val)
+                print("gen disentanglement loss :", gen_disentangle_val)
+                print("gen id classifier loss :", gen_cla_cost_val)
+                print("total weigthted gen loss :", gen_total_cost_val)
+                print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
+                print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
+                print("gen id classifier accuracy:", gen_cla_accuracy_val)
+                if args.debug:
+                    bn3_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn3/beta'), tf.all_variables())[0]
+                    bn3_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn3/gamma'), tf.all_variables())[0]
+                    bn4_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn4/beta'), tf.all_variables())[0]
+                    bn4_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn4/gamma'), tf.all_variables())[0]
+                    print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/"+str(sess.run(bn3_gamma)))
+                    print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/"+str(sess.run(bn4_gamma)))
+                if end_reconst > len(trY):
+                    np.random.shuffle(index_reconst)
+                    start_reconst, end_reconst = resetIndex()
+                    epoch += 1
+                    draw_flag += 1
+                    print("epoch:", epoch)
+                recon_cum += 1
+                iterations += 1
+            disen_cum = 1
+            perfect_series=0
+            while disen_cum == 1 or (disen_cum <= args.dis_series and dis_prediction_val_left[0] <= 0.70 and perfect_series <= 100):
+                Xs_left_disentangle = trX[index_disentangle[start_disentangle:end_disentangle]].reshape(
+                    [-1, 28, 28, 1]) / 255.
+                Ys_left_disentangle = OneHot(trY[index_disentangle[start_disentangle:end_disentangle]], 10)
+
+                Xs_right, Ys_right = randomPickRight(start_disentangle, end_disentangle, trX,
+                                                     trY[index_disentangle[start_disentangle:end_disentangle]],
+                                                     indexTable)
+                Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
+                _, summary, dis_cost_val, dis_total_cost_val, \
+                        dis_prediction_val_left, dis_prediction_val_right \
+                    = sess.run(
+                        [train_op_discrim, summary_adv_merge_scalar, dis_cost_tf, dis_total_cost_tf, \
+                         dis_prediction_tf_left, dis_prediction_tf_right],
+                        feed_dict={
+                            Y_left_tf:Ys_left_disentangle,
+                            Y_right_tf:Ys_left_disentangle,
+                            image_tf_real_left: Xs_left_disentangle,
+                            image_tf_real_right: Xs_right
+                            })
+                if np.mod(tf.train.global_step(sess, global_step), args.summary_update_step) == 0 \
+                        and np.mod(disen_cum, args.summary_update_step) == 0:
+                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                start_disentangle += batch_size
+                end_disentangle += batch_size
+                print("=========== updating D ==========")
+                print("iteration and disencum:", iterations, disen_cum)
+                print("discriminator loss:", dis_cost_val)
+                print("discriminator total weigthted loss:", dis_total_cost_val)
+                print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
+                print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
+                # moving_mean = filter(lambda x: x.name.startswith('dis_bn1/moving_mean'), tf.all_variables())[0]
+                # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
                 if end_disentangle > len(trY):
                     np.random.shuffle(index_disentangle)
                     start_disentangle, end_disentangle = resetIndex()
+                if dis_prediction_val_left[1] <= 0.13:
+                    perfect_series+=1
+                else:
+                    perfect_series = 0
+                disen_cum += 1
+                iterations += 1
+                # start to train gan, D first
+            gan_cum = 1
+            while gan_cum <= args.gan_series:
+                Xs_left_gan = trX[index_gan[start_gan:end_gan]].reshape([-1, 28, 28, 1]) / 255.
+                Ys_left_gan = OneHot(trY[index_gan[start_gan:end_gan]], 10)
+                Xs_right, Ys_right = randomPickRight(start_gan, end_gan, trX,
+                                                     trY[index_gan[start_gan:end_gan]], indexTable,
+                                                     feature="F_I_F_D_F_V")
+                Ys_right = OneHot(Ys_right, 10)
+                Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
+                _, summary, gan_dis_cost \
+                    = sess.run(
+                    [train_op_gan_discrim, summary_gan_dis_merge_scalar, gan_dis_cost_tf],
+                    feed_dict={
+                        Y_left_tf: Ys_left_gan,
+                        Y_right_tf: Ys_right,
+                        image_tf_real_left: Xs_left_gan,
+                        image_tf_real_right: Xs_right
+                    }
+                )
+                print("=========== updating gan D ==========")
+                print("iteration and gan_cum:", iterations, gan_cum)
+                print("gan_dis_cost:", gan_dis_cost)
+                if np.mod(tf.train.global_step(sess, global_step), args.summary_update_step) == 0:
+                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                # moving_mean = filter(lambda x: x.name.startswith('gan_dis_bn1/moving_mean'), tf.all_variables())[0]
+                # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
+                # train G
+                _, summary, gan_gen_cost_val, gen_disentangle_val, gen_cla_cost_val, gan_total_cost_val, \
+                dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
+                    = sess.run(
+                    [train_op_gan_gen, summary_gan_gen_merge_scalar, gan_gen_cost_tf,
+                     gen_disentangle_cost_tf, gen_cla_cost_tf, gan_total_cost_tf,
+                     dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
+                    feed_dict={
+                        Y_left_tf: Ys_left_gan,
+                        Y_right_tf: Ys_right,
+                        image_tf_real_left: Xs_left_gan,
+                        image_tf_real_right: Xs_right
+                })
+                start_gan += batch_size
+                end_gan += batch_size
+                print("=========== updating gan G ==========")
+                print("iteration:", iterations)
+                print("gan gen loss:", gan_gen_cost_val)
+                print("gen disentanglement loss :", gen_disentangle_val)
+                print("gen id classifier loss :", gen_cla_cost_val)
+                print("total weigthted gan loss :", gan_total_cost_val)
+                print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
+                print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
+                print("gen id classifier accuracy:", gen_cla_accuracy_val)
+                if np.mod(tf.train.global_step(sess, global_step), args.summary_update_step) == 0:
+                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
+                if args.debug:
+                    bn3_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn3/beta'), tf.all_variables())[0]
+                    bn3_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn3/gamma'), tf.all_variables())[0]
+                    bn4_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn4/beta'), tf.all_variables())[0]
+                    bn4_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn4/gamma'), tf.all_variables())[0]
+                    print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/" + str(sess.run(bn3_gamma)))
+                    print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/" + str(sess.run(bn4_gamma)))
                 if end_gan > len(trY):
                     np.random.shuffle(index_gan)
                     start_gan, end_gan = resetIndex()
-
-                Xs_left_disentangle = trX[index_disentangle[start_disentangle:end_disentangle]].reshape([-1, 28, 28, 1]) / 255.
-                Ys_left_disentangle = OneHot(trY[index_disentangle[start_disentangle:end_disentangle]], 10)
-                Xs_left_reconst = trX[index_reconst[start_reconst:end_reconst]].reshape([-1, 28, 28, 1]) / 255.
-                Ys_left_reconst = OneHot(trY[index_reconst[start_reconst:end_reconst]], 10)
-                Xs_left_gan = trX[index_gan[start_gan:end_gan]].reshape([-1, 28, 28, 1]) / 255.
-                Ys_left_gan = OneHot(trY[index_gan[start_gan:end_gan]], 10)
-                Xs_right = []
-                Ys_right = []
-
-                modulus = np.mod(iterations, args.gan_series + args.dis_series + args.recon_series)
-
-                if modulus < args.recon_series:
-                    Xs_right, Ys_right = randomPickRight(start_reconst, end_reconst, trX,
-                                                         trY[index_reconst[start_reconst:end_reconst]], indexTable)
-                    Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
-                elif modulus < args.recon_series + args.dis_series:
-                    Xs_right, Ys_right = randomPickRight(start_disentangle, end_disentangle, trX,
-                                                         trY[index_disentangle[start_disentangle:end_disentangle]],
-                                                         indexTable)
-                    Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
-                else:
-                    Xs_right, Ys_right = randomPickRight(start_gan, end_gan, trX,
-                                                         trY[index_disentangle[start_gan:end_gan]], indexTable,
-                                                         feature="F_I_F_D_F_V")
-                    Ys_right = OneHot(Ys_right, 10)
-                    Xs_right = Xs_right.reshape([-1, 28, 28, 1]) / 255.
-                if modulus < args.recon_series:
-                    _, summary, gen_recon_cost_val, gen_disentangle_val, gen_cla_cost_val, gen_total_cost_val, \
-                            dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
-                        = sess.run(
-                            [train_op_gen, merged_summary, g_recon_cost_tf,
-                             gen_disentangle_cost_tf, gen_cla_cost_tf, gen_total_cost_tf,
-                             dis_prediction_tf_left, dis_prediction_tf_right,gen_cla_accuracy_tf],
-                            feed_dict={
-                                Y_left_tf:Ys_left_reconst,
-                                Y_right_tf:Ys_left_reconst,
-                                image_tf_real_left: Xs_left_reconst,
-                                image_tf_real_right: Xs_right
-                            })
-                    start_reconst += batch_size
-                    end_reconst += batch_size
-                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-                    print("=========== updating G ==========")
-                    print("iteration:", iterations)
-                    print("gen reconstruction loss:", gen_recon_cost_val)
-                    print("gen disentanglement loss :", gen_disentangle_val)
-                    print("gen id classifier loss :", gen_cla_cost_val)
-                    print("total weigthted gen loss :", gen_total_cost_val)
-                    print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
-                    print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
-                    print("gen id classifier accuracy:", gen_cla_accuracy_val)
-                    if args.debug:
-                        bn3_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn3/beta'), tf.all_variables())[0]
-                        bn3_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn3/gamma'), tf.all_variables())[0]
-                        bn4_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn4/beta'), tf.all_variables())[0]
-                        bn4_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn4/gamma'), tf.all_variables())[0]
-                        print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/"+str(sess.run(bn3_gamma)))
-                        print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/"+str(sess.run(bn4_gamma)))
-                elif modulus < args.recon_series + args.dis_series:
-                    _, summary, dis_cost_val, dis_total_cost_val, \
-                            dis_prediction_val_left, dis_prediction_val_right \
-                        = sess.run(
-                            [train_op_discrim, merged_summary, dis_cost_tf, dis_total_cost_tf, \
-                             dis_prediction_tf_left, dis_prediction_tf_right],
-                            feed_dict={
-                                Y_left_tf:Ys_left_disentangle,
-                                Y_right_tf:Ys_left_disentangle,
-                                image_tf_real_left: Xs_left_disentangle,
-                                image_tf_real_right: Xs_right
-                                })
-                    training_writer.add_summary(summary, tf.train.global_step(sess, global_step))
-                    start_disentangle += batch_size
-                    end_disentangle += batch_size
-                    print("=========== updating D ==========")
-                    print("iteration:", iterations)
-                    print("discriminator loss:", dis_cost_val)
-                    print("discriminator total weigthted loss:", dis_total_cost_val)
-                    print("discrim left correct prediction's max,mean,min :", dis_prediction_val_left)
-                    print("discrim right correct prediction's max,mean,min :", dis_prediction_val_right)
-                    # moving_mean = filter(lambda x: x.name.startswith('dis_bn1/moving_mean'), tf.all_variables())[0]
-                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
-                    if np.mod(iterations, drawing_step) == 0:
-                        indexTableVal = [[] for i in range(10)]
-                        for index in range(len(vaY)):
-                            indexTableVal[vaY[index]].append(index)
-                        corrRightVal, _ = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
-                        image_real_left = vaX[0:visualize_dim].reshape([-1, 28, 28, 1]) / 255
-                        VDSN_model.is_training = False
-                        generated_samples_left, F_V_matrix, F_I_matrix = sess.run(
-                                [image_gen_left, F_V_left_tf, F_I_left_tf],
-                                feed_dict={
-                                    image_tf_real_left: image_real_left,
-                                    image_tf_real_right: corrRightVal.reshape([-1, 28, 28, 1]) / 255
-                                    })
-                        # since 16 * 8  = batch size * 2
-                        save_visualization_triplet(image_real_left, corrRightVal.reshape([-1, 28, 28, 1]) / 255,
-                                                   generated_samples_left,
-                                                   (int(math.ceil(batch_size ** (.5))),
-                                                    int(math.ceil(batch_size / math.ceil(batch_size ** (.5))))),
-                                                   save_path=args.pic_dir_parent + time_dir + '/sample_%04d.jpg' % int(
-                                                       iterations))
-                        VDSN_model.is_training = True
-                else:
-                    # start to train gan, D first
-                    _, summary, gan_dis_cost \
-                        = sess.run(
-                        [train_op_gan_discrim, merged_summary, gan_dis_cost_tf],
-                        feed_dict={
-                            Y_left_tf: Ys_left_gan,
-                            Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left_gan,
-                            image_tf_real_right: Xs_right
-                        }
-                    )
-                    print("=========== updating gan D ==========")
-                    print("iteration:", iterations)
-                    print("gan_dis_cost:", gan_dis_cost)
-                    # moving_mean = filter(lambda x: x.name.startswith('gan_dis_bn1/moving_mean'), tf.all_variables())[0]
-                    # print(moving_mean.name + ":" + str(sess.run(moving_mean)))
-                    # train G
-                    _, summary, gan_gen_cost_val, gen_disentangle_val, gen_cla_cost_val, gan_total_cost_val, \
-                    dis_prediction_val_left, dis_prediction_val_right, gen_cla_accuracy_val \
-                        = sess.run(
-                        [train_op_gan_gen, merged_summary, gan_gen_cost_tf,
-                         gen_disentangle_cost_tf, gen_cla_cost_tf, gan_total_cost_tf,
-                         dis_prediction_tf_left, dis_prediction_tf_right, gen_cla_accuracy_tf],
-                        feed_dict={
-                            Y_left_tf: Ys_left_gan,
-                            Y_right_tf: Ys_right,
-                            image_tf_real_left: Xs_left_gan,
-                            image_tf_real_right: Xs_right
-                    })
-                    start_gan += batch_size
-                    end_gan += batch_size
-                    print("=========== updating gan G ==========")
-                    print("iteration:", iterations)
-                    print("gan gen loss:", gan_gen_cost_val)
-                    print("gen disentanglement loss :", gen_disentangle_val)
-                    print("gen id classifier loss :", gen_cla_cost_val)
-                    print("total weigthted gan loss :", gan_total_cost_val)
-                    print("discrim left correct prediction's max,mean,min:", dis_prediction_val_left)
-                    print("discrim right correct prediction's max,mean,min:", dis_prediction_val_right)
-                    print("gen id classifier accuracy:", gen_cla_accuracy_val)
-                    if args.debug:
-                        bn3_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn3/beta'), tf.all_variables())[0]
-                        bn3_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn3/gamma'), tf.all_variables())[0]
-                        bn4_beta = filter(lambda x: x.name.startswith('fix_scale_en_bn4/beta'), tf.all_variables())[0]
-                        bn4_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn4/gamma'), tf.all_variables())[0]
-                        print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/" + str(sess.run(bn3_gamma)))
-                        print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/" + str(sess.run(bn4_gamma)))
+                gan_cum += 1
                 iterations += 1
-                if np.mod(iterations, args.save_step) == 0 and iterations >= args.save_step:
-                    save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
-                    print("Model saved in file: %s" % save_path)
+            if draw_flag == 1:
+                draw_flag-=1
+                draw_img();
 
-            np.random.shuffle(index_reconst)
-            start_reconst, end_reconst = resetIndex()
-            epoch += 1
+            if iterations >= save_step_acc:
+                save_path = saver.save(sess, "{}model.ckpt".format(model_dir), global_step=global_step)
+                print("Model saved in file: %s" % save_path)
+                save_step_acc += args.save_step
+
+
+
 
         # Save the variables to disk.
-        save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
+        save_path = saver.save(sess, "{}model.ckpt".format(model_dir), global_step=global_step)
         print("Model saved in file: %s" % save_path)
 
     except KeyboardInterrupt:
         print("Manual interrupt occurred.")
         print('Done training for {} steps'.format(iterations))
-        save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
+        save_path = saver.save(sess, "{}model.ckpt".format(model_dir), global_step=global_step)
         print("Model saved in file: %s" % save_path)
 
 F_classification_conf = {
@@ -497,10 +546,10 @@ if args.validate_disentanglement:
     tf.reset_default_graph()
     F_V_classification_conf = copy.deepcopy(F_classification_conf)
     F_V_classification_conf["feature_selection"] = "F_V"
-    classification_validation.validate_F_classification(F_V_classification_conf,trX,trY,vaX,vaY,teX,teY,True)
+    classification_validation.validate_F_classification(F_V_classification_conf, trX, trY, vaX, vaY, teX, teY, True)
 
 if args.validate_classification:
     tf.reset_default_graph()
     F_I_classification_conf = copy.deepcopy(F_classification_conf)
     F_I_classification_conf["feature_selection"] = "F_I"
-    classification_validation.validate_F_classification(F_I_classification_conf,trX,trY,vaX,vaY,teX,teY,True)
+    classification_validation.validate_F_classification(F_I_classification_conf, trX, trY, vaX, vaY, teX, teY, True)

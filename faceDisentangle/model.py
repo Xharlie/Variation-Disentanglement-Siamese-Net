@@ -412,7 +412,7 @@ class VDSN_FACE(object):
             p2.dtype == tf.float16) else p2
         # labels and logits must be of the same type
         p1 = tf.cast(p1, precise_p2.dtype)
-        return tf.reduce_mean(-tf.reduce_sum(p1 * tf.log(p2), reduction_indices=[1]))
+        return tf.reduce_mean(-tf.reduce_sum(p1 * tf.log(p2 + 1e-8), reduction_indices=[1]))
 
     def encoder(self, image, reuse=True):
 

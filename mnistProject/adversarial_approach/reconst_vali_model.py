@@ -1,7 +1,5 @@
 import sys
 sys.path.append("./")
-import tensorflow as tf
-import numpy as np
 from neural_helper import *
 import model
 

@@ -1,0 +1,178 @@
+train validation:
+
+nohup python train.py --drawing_step 1000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 700 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.10 &
+
+2017-11-20-20-47-32  78%
+
+nohup python train.py --drawing_step 1000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 700 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.1 &
+
+2017-11-20-20-50-20   89%
+
+----------------------------- train with disentanglement-weight as 10
+
+--------- bn not on FV, FI
+nohup python train.py --drawing_step 1000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.10 &
+
+2017-11-22-21-35-26
+76%
+
+nohup python train.py --drawing_step 1000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.1 &
+
+2017-11-22-21-35-27
+89%
+
+--------- bn not update everywhere
+nohup python train_alter.py --drawing_step 1000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.10_alter &
+
+2017-11-22-22-42-22
+71.58%
+
+nohup python train_alter.py --drawing_step 1000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.1_alter &
+
+2017-11-22-22-42-26
+80.6%
+
+--------- bn not update everywhere + larger disentangle learning rate:
+
+nohup python train_alter.py --dis_start_learning_rate 0.01 --drawing_step 10000 --gen_decay_step 3000 --gen_decay_rate 0.99 --dis_decay_step 3000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.10_alter_dis_moreRate &
+
+2017-11-23-16-06-36
+50%
+
+nohup python train_alter.py --dis_start_learning_rate 0.01 --drawing_step 10000 --gen_decay_step 3000 --gen_decay_rate 0.99 --dis_decay_step 3000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.1_alter_dis_moreRate &
+
+2017-11-23-12-10-50
+69%
+
+--------- bn not update everywhere + hybrid loss:
+
+nohup python train_alter.py --disentangle_obj_func hybrid --drawing_step 10000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.10_alter_hybrid &
+2017-11-23-16-08-29
+68%
+
+nohup python train_alter.py --disentangle_obj_func hybrid --drawing_step 10000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.1_alter_hybrid &
+2017-11-23-16-10-28
+79%
+
+--------- bn not update everywhere + hybrid and entropy loss:
+
+nohup python train_alter.py --disentangle_obj_func entropyhybrid --drawing_step 10000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.10_alter_hybridentropy &
+2017-11-23-16-18-17
+67%
+
+
+nohup python train_alter.py --disentangle_obj_func entropyhybrid --drawing_step 10000 --gen_decay_step 3000 --gen_decay_rate 0.995 --dis_decay_step 3000 --dis_decay_rate 0.995 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.995 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 10 --F_V_validation_test_batch_size 64 &> train.1.1.1_alter_hybridentropy &
+2017-11-23-16-19-36
+78%
+
+----------------------------------------- train with disentangle rate 50, complex entropy loss and batchnorm not update ------------------------------------------------
+larger --dis_start_learning_rate  with 0.01,  bn not update everywhere, --disentangle_obj_func entropyhybrid, --dis_series 10, --gen_series 1, --gan_series 1, decay_rate 0.99
+
+nohup python train.py --disentangle_obj_func entropyhybrid --dis_start_learning_rate 0.01 --gen_decay_step 3000 --gen_decay_rate 0.99 --dis_decay_step 3000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 50 --F_V_validation_test_batch_size 64 &> train.1.1.10_hybridentropy_dis50_disrate0.01 &
+56.4%
+
+nohup python train.py --disentangle_obj_func entropyhybrid --dis_start_learning_rate 0.01 --gen_decay_step 3000 --gen_decay_rate 0.99 --dis_decay_step 3000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 1 --gen_disentangle_weight 50 --F_V_validation_test_batch_size 64 &> train.1.1.1_hybridentropy_dis50_disrate0.01 &
+77.4%
+
+nohup python train.py --disentangle_obj_func entropyhybrid --dis_start_learning_rate 0.01 --gen_decay_step 3000 --gen_decay_rate 0.99 --dis_decay_step 3000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 20 --gen_disentangle_weight 50 --F_V_validation_test_batch_size 64 &> train.1.1.20_hybridentropy_dis50_disrate0.01 &
+47.2%
+
+--dis_start_learning_rate 0.02 --gen_start_learning_rate 0.004 --gan_start_learning_rate 0.004
+75%
+
+nohup python train.py --disentangle_obj_func entropyhybrid --dis_start_learning_rate 0.02 --gen_start_learning_rate 0.004 --gan_start_learning_rate 0.004 --gen_decay_step 3000 --gen_decay_rate 0.99 --dis_decay_step 3000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 1000 --gan_decay_step 3000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 10 --gen_disentangle_weight 50 --F_V_validation_test_batch_size 64 &> train.1.1.10_hybridentropy_dis50_disrate0.02 &
+
+61.3%
+
+
+tensorboard --logdir=base:2017-11-16-21-14-59,bn-10-1-1:2017-11-20-20-47-32,bn-no-fea-10-1-1:2017-11-22-21-35-26,bn-no-all-10-1-1:2017-11-22-22-42-22,bn-no-all-high-disentagle-10-1-1:2017-11-23-16-06-36,bn-no-all-hybrid-10-1-1:2017-11-23-16-08-29,bn-no-all-complex-10-1-1:2017-11-23-16-18-17,bn-1-1-1:2017-11-20-20-50-20,bn-no-fea-1-1-1:2017-11-22-21-35-27,bn-no-all-1-1-1:2017-11-22-22-42-26,bn-no-all-high-disentagle-1-1-1:2017-11-23-12-10-50,bn-no-all-hybrid-1-1-1:2017-11-23-16-10-28,bn-no-all-complex-1-1-1:2017-11-23-16-19-36 --port 6008
+
+
+recon validation:
+
+python reconst_vali.py --save_path "/Users/charlie/dev/vdsn/mnistProject/model_treasury/2017-11-23-16-06-36/model.ckpt" --feature_selection interpolation --interpolation_step 5 --batch_size 1
+
+--------------------------------------------------- changed soft bn etc --------------------------------------------------------------
+nohup python -u train.py --disentangle_obj_func hybrid --dis_start_learning_rate 0.01 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 63 --gen_disentangle_weight 20 --F_V_validation_test_batch_size 64 &> train.1.1.63_hybrid_dis20_disrate0.01 &
+
+nohup python -u train.py --disentangle_obj_func hybrid --soft_bn --dis_start_learning_rate 0.01 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 63 --gen_disentangle_weight 20 --F_V_validation_test_batch_size 64 &> train.1.1.63_hybrid_dis20_disrate0.01_soft_bntrue &
+
+nohup python -u train.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_decay_step 3000 --gen_decay_rate 0.99 --dis_decay_step 3000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 63 --gen_disentangle_weight 0.03 --F_V_validation_test_batch_size 64 &> train.1.1.63_hybrid_dis0.1_disrate0.01_train_bntrue &
+2017-12-29-15-26-24
+
+nohup python -u train.py --disentangle_obj_func hybrid --train_bn --soft_bn --dis_start_learning_rate 0.01 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 63 --gen_disentangle_weight 20 --F_V_validation_test_batch_size 64 &> train.1.1.63_hybrid_dis20_disrate0.01_soft_bntrue_train_bntrue &
+
+
+------------ dynamic
+nohup python -u train_dynamic.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_decay_step 10000 --gen_decay_rate 0.99 --dis_decay_step 10000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 1 --F_V_validation_test_batch_size 64 &> train.1.1.1000_dynamic_hybrid_dis1_disrate0.01_train_bntrue &
+2017-12-29-01-40-07
+97%
+
+nohup python -u train_dynamic.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.01  --gen_decay_step 10000 --gen_decay_rate 0.99 --dis_decay_step 10000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 0.1 --F_V_validation_test_batch_size 64 &> train.1.1.1000_dynamic_hybrid_dis0.1_disrate0.01_train_bntrue &
+2017-12-29-15-56-37, not good
+
+nohup python -u train_dynamic.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_decay_step 10000 --gen_decay_rate 0.99 --dis_decay_step 10000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 0.03 --F_V_validation_test_batch_size 64 &> train.1.1.1000_dynamic_hybrid_dis0.03_disrate0.01_train_bntrue &
+2017-12-29-15-14-16, not good
+
+nohup python -u train_dynamic.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 1 --gen_decay_step 10000 --gen_decay_rate 0.99 --dis_decay_step 10000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 0.05 --F_V_validation_test_batch_size 64 --gen_regularizer_weight 0.00001 &> train.1.0.1000_dynamic_hybrid_dis0.03_disrate0.01_train_bntrue &
+2017-12-29-21-28-45
+
+nohup python -u train_dynamic.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 1 --gen_decay_step 10000 --gen_decay_rate 0.99 --dis_decay_step 10000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 0.01 --F_V_validation_test_batch_size 64 --gen_regularizer_weight 0.00001 &> train.1.0.1000_dynamic_hybrid_dis0.03_disrate0.01_train_bntrue &
+2017-12-29-21-28-54
+
+----------------- dynamic test cost function
+hybrid20
+nohup python -u train_dynamic.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 20 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_hybrid_dis20_disrate0.01_train_bntrue &
+2018-01-07-14-56-00
+
+negative_log20
+nohup python -u train_dynamic.py --disentangle_obj_func negative_log --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 20 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_negative_log_dis20_disrate0.01_train_bntrue &
+2018-01-07-14-55-40
+
+hybridentropy20
+nohup python -u train_dynamic.py --disentangle_obj_func hybridentropy --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 20 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_hybridentropy_dis20_disrate0.01_train_bntrue &
+2018-01-07-14-53-30
+
+one_minus63
+nohup python -u train_dynamic.py --disentangle_obj_func one_minus --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_one_minus_dis63_disrate0.01_train_bntrue &
+2018-01-07-14-54-56
+
+negative_log63
+nohup python -u train_dynamic.py --disentangle_obj_func negative_log --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_negative_log_dis63_disrate0.01_train_bntrue &
+2018-01-07-14-51-58
+
+hybrid63
+nohup python -u train_dynamic.py --disentangle_obj_func hybrid --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_hybrid_dis63_disrate0.01_train_bntrue &
+2018-01-07-14-52-18
+
+hybridentropy63
+nohup python -u train_dynamic.py --disentangle_obj_func hybridentropy --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_hybridentropy_dis63_disrate0.01_train_bntrue &
+2018-01-07-14-52-40
+
+negative_log63soft
+nohup python -u train_dynamic.py --disentangle_obj_func negative_log --train_bn --soft_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.0.1000_softbn_dynamic_negative_log_dis63_disrate0.01_train_bntrue &
+2018-01-08-00-52-25
+
+entropy 20
+python -u train_dynamic.py --disentangle_obj_func entropy --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 20 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_entropy_dis20_disrate0.01_train_bntrue &
+bad
+
+even63
+nohup python -u train_dynamic.py --disentangle_obj_func even --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_even_dis63_disrate0.01_train_bntrue &
+2018-01-02-01-22-59
+bad
+
+---------------------- classification validation -------------------------
+python -u classification_validation.py --not_split_encoder --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/model_treasury/2017-11-23-16-18-17/model.ckpt --feature_selection F_I --F_validation_test_batch_size 128
+
+python -u classification_validation.py --not_split_encoder --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/model_treasury/2017-12-29-21-45-30/model.ckpt --feature_selection F_V --F_validation_test_batch_size 128
+
+----------------- dynamic cost function + split encoder + less summary------------------------
+
+negative_log63
+nohup python -u train_dynamic.py --disentangle_obj_func negative_log --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.0.1000_dynamic_negative_log_dis63_disrate0.01_train_bntrue_splitencoder &
+2018-01-09-01-11-36
+
+negative_log63 with gan as 1
+nohup python -u train_dynamic.py --disentangle_obj_func negative_log --train_bn  --dis_start_learning_rate 0.01 --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --dis_decay_step 1000 --dis_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 1 --recon_series 1 --dis_series 1000 --gen_disentangle_weight 63 --F_V_validation_test_batch_size 64 &> train.1.1.1000_dynamic_negative_log_dis63_disrate0.01_train_bntrue_splitencoder &
+2018-01-09-01-13-35

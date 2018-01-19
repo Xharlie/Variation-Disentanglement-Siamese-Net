@@ -1,13 +1,9 @@
-import os
-import numpy as np
-from model import *
+from mnistProject.adversarial_approach.model import *
 from util import *
 from cluster import *
 from load import mnist_with_valid_set
 from time import localtime, strftime
 import argparse
-import json
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--gen_start_learning_rate", nargs='?', type=float, default=0.002,

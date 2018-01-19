@@ -10,7 +10,7 @@ This function would train a classifier on top of the representation F,
 make sure it cannot train out the Identity
 '''
 
-def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=False):
+def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=True):
 
     check_create_dir(conf["logs_dir_root"])
     check_create_dir(conf["logs_dir_root"] + conf["F_validation_logs_dir_root"])
@@ -27,10 +27,12 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=False):
         dim_W1=conf["dim_W1"],
         dim_W2=conf["dim_W2"],
         dim_W3=conf["dim_W3"],
-        dim_F_I=conf["dim_F_I"]
+        dim_F_I=conf["dim_F_I"],
+        split_encoder = conf["split_encoder"]
     )
     F_validation.is_training = False
-    Y_tf, image_real_tf, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob_tf,accuracy_tf \
+    Y_tf, image_real_tf,image_real_support_tf, dis_cost_tf, dis_total_cost_tf, Y_prediction_prob_tf,\
+    accuracy_tf, gen_recon_cost_tf, accuracy_gen_tf \
         = F_validation_model.build_model(feature_selection= conf["feature_selection"],
                                            dis_regularizer_weight=conf["dis_regularizer_weight"])
 
@@ -40,9 +42,9 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=False):
     gen_vars = filter(lambda x: x.name.startswith('gen'), tf.trainable_variables())
     # include en_* and encoder_* W and b,
     encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
-
-    train_op = tf.train.AdamOptimizer(conf["F_validation_learning_rate"], beta1=0.5) \
-        .minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
+    with tf.control_dependencies(tf.get_collection(ADV_BATCH_NORM_OPS)):
+        train_op = tf.train.AdamOptimizer(conf["F_validation_learning_rate"], beta1=0.5) \
+            .minimize(dis_total_cost_tf, var_list=discrim_vars, global_step=global_step)
     iterations = 0
 
     with tf.Session(config=tf.ConfigProto()) as sess:
@@ -72,10 +74,10 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=False):
                 Xs = trX[start:end].reshape([-1, 28, 28, 1]) / 255.
                 Ys = OneHot(trY[start:end], 10)
 
-                _, summary, dis_cost_val, dis_total_cost_val, Y_prediction_prob_val,accuracy_val \
+                _, summary, dis_cost_val, dis_total_cost_val, Y_prediction_prob_val, accuracy_val \
                     = sess.run(
                         [train_op, train_merged_summary, dis_cost_tf,
-                         dis_total_cost_tf, Y_prediction_prob_tf,accuracy_tf],
+                         dis_total_cost_tf, Y_prediction_prob_tf, accuracy_tf],
                         feed_dict={
                             Y_tf: Ys,
                             image_real_tf: Xs,
@@ -132,17 +134,17 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=False):
                                         tf.train.global_step(sess, global_step))
 
         ''' test phase at the end '''
-        if test:
+        if test and conf["feature_selection"]=='F_V':
             dis_cost_val_list = []
             dis_total_cost_val_list = []
             accuracy_val_list = []
+            F_validation_model.is_training = False
             for start, end in zip(
                     range(0, len(teY), conf["F_validation_test_batch_size"]),
                     range(conf["F_validation_test_batch_size"], len(teY), conf["F_validation_test_batch_size"])
             ):
                 Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
                 Ys = OneHot(teY[start:end], 10)
-
                 summary, dis_cost_val, dis_total_cost_val, Y_prediction_prob_val, accuracy_val \
                     = sess.run(
                     [test_merged_summary, dis_cost_tf,
@@ -161,19 +163,77 @@ def validate_F_classification(conf,trX,trY,vaX,vaY,teX,teY,test=False):
             print("test discriminator loss:", dis_cost_val)
             print("test discriminator total weigthted loss:", dis_total_cost_val)
             print("test discriminator accuracy:", accuracy_val)
-            test_dis_cost_val_summary = tf.Summary(
-                value=[tf.Summary.Value(tag="test_dis_cost", simple_value=dis_cost_val)])
-            training_writer.add_summary(test_dis_cost_val_summary,
-                                        tf.train.global_step(sess, global_step))
-            test_dis_total_cost_val_summary = tf.Summary(
-                value=[tf.Summary.Value(tag="test_dis_total_cost", simple_value=dis_total_cost_val)])
-            training_writer.add_summary(test_dis_total_cost_val_summary,
-                                        tf.train.global_step(sess, global_step))
-            test_accuracy_val_summary = tf.Summary(
-                value=[tf.Summary.Value(tag="test_accuracy", simple_value=accuracy_val)])
-            training_writer.add_summary(test_accuracy_val_summary,
-                                        tf.train.global_step(sess, global_step))
-            # except KeyboardInterrupt
+
+        elif test and conf["feature_selection"] == 'F_I':
+            indexTable = [[] for i in range(conf["dim_y"])]
+            for index in range(len(teX)):
+                indexTable[teY[index]].append(index)
+            accuracy_val_list = []
+            gen_pixel_diff_list = []
+            gen_same_accuracy_list = []
+            gen_diff_accuracy_list = []
+            F_validation_model.is_training = False
+            for start, end in zip(
+                    range(0, len(teY), conf["F_validation_test_batch_size"]),
+                    range(conf["F_validation_test_batch_size"], len(teY), conf["F_validation_test_batch_size"])
+            ):
+                Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
+                Ys = OneHot(teY[start:end], 10)
+                Xs_support, Ys_support = randomPickRight(start, end, trX,
+                                                     trY[start:end],
+                                                     indexTable)
+                Xs_support = Xs_support.reshape([-1, 28, 28, 1]) / 255.
+
+                summary, dis_cost_val, dis_total_cost_val, Y_prediction_prob_val, accuracy_val,gen_pixel_diff,gen_same_accuracy \
+                    = sess.run(
+                    [test_merged_summary, dis_cost_tf,
+                     dis_total_cost_tf, Y_prediction_prob_tf, accuracy_tf, gen_recon_cost_tf, accuracy_gen_tf],
+                    feed_dict={
+                        Y_tf: Ys,
+                        image_real_tf: Xs,
+                        image_real_support_tf: Xs_support,
+                    })
+
+                accuracy_val_list.append(accuracy_val)
+                gen_pixel_diff_list.append(gen_pixel_diff)
+                gen_same_accuracy_list.append(gen_same_accuracy)
+
+            for start, end in zip(
+                    range(0, len(teY), conf["F_validation_test_batch_size"]),
+                    range(conf["F_validation_test_batch_size"], len(teY), conf["F_validation_test_batch_size"])
+            ):
+                Xs = teX[start:end].reshape([-1, 28, 28, 1]) / 255.
+                Ys = OneHot(teY[start:end], 10)
+                Xs_support, Ys_support = randomPickRight(start, end, trX,
+                                                     trY[start:end], indexTable,
+                                                     feature="F_I_F_D_F_V")
+                Ys_support = OneHot(Ys_support, 10)
+                Xs_support = Xs_support.reshape([-1, 28, 28, 1]) / 255.
+
+                summary, dis_cost_val, dis_total_cost_val, Y_prediction_prob_val, accuracy_val,gen_pixel_diff, gen_diff_accuracy \
+                    = sess.run(
+                    [test_merged_summary, dis_cost_tf,
+                     dis_total_cost_tf, Y_prediction_prob_tf, accuracy_tf,gen_recon_cost_tf, accuracy_gen_tf],
+                    feed_dict={
+                        Y_tf: Ys,
+                        image_real_tf: Xs,
+                        image_real_support_tf: Xs_support,
+                    })
+
+                accuracy_val_list.append(accuracy_val)
+                gen_pixel_diff_list.append(gen_pixel_diff)
+                gen_diff_accuracy_list.append(gen_diff_accuracy)
+
+            accuracy_val = sum(accuracy_val_list) / len(accuracy_val_list)
+            gen_pixel_diff = sum(gen_pixel_diff_list) / len(gen_pixel_diff_list)
+            gen_same_accuracy = sum(gen_same_accuracy_list) / len(gen_same_accuracy_list)
+            gen_diff_accuracy = sum(gen_diff_accuracy_list) / len(gen_diff_accuracy_list)
+            print("=========== iteration: ==========", iterations)
+            print("test discriminator accuracy:", accuracy_val)
+            print("test gen pixel mse:", gen_pixel_diff)
+            print("test gen same accuracy:", gen_same_accuracy)
+            print("test gen diff accuracy:", gen_diff_accuracy)
+
 
     with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
         json.dump(dict(conf), file)
@@ -235,6 +295,9 @@ if __name__ == "__main__":
     parser.add_argument("--time_dir", nargs='?', type=str, default='',
                         help="time dir for tensorboard")
 
+    parser.add_argument("--not_split_encoder", action="store_true",
+                        help="use moving in training")
+
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_ind
 
@@ -257,7 +320,8 @@ if __name__ == "__main__":
         "F_validation_n_epochs": args.F_validation_n_epochs,
         "F_validation_learning_rate": args.F_validation_learning_rate,
         "time_dir": args.time_dir,
-        "feature_selection" : args.feature_selection
+        "feature_selection" : args.feature_selection,
+        "split_encoder" : (not args.not_split_encoder)
     }
     validate_F_classification(F_classification_conf,trX,trY,vaX,vaY,teX,teY)
 
