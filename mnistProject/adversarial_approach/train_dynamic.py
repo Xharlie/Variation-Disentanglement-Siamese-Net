@@ -25,11 +25,11 @@ parser.add_argument("--gan_start_learning_rate", nargs='?', type=float, default=
 parser.add_argument("--gen_decay_step", nargs='?', type=int, default=10000,
                     help="generator decay step")
 
-parser.add_argument("--dis_decay_step", nargs='?', type=int, default=10000,
-                    help="generator decay step")
-
 parser.add_argument("--gen_decay_rate", nargs='?', type=float, default=0.80,
                     help="generator decay rate")
+
+parser.add_argument("--dis_decay_step", nargs='?', type=int, default=10000,
+                    help="generator decay step")
 
 parser.add_argument("--dis_decay_rate", nargs='?', type=float, default=1.00,
                     help="discriminator decay rate")

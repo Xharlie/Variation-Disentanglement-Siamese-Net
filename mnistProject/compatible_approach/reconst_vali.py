@@ -1,9 +1,9 @@
 import numpy as np
 import tensorflow as tf
 from reconst_vali_model import *
-from mnistProject.util import *
+from util import *
 import argparse
-from mnistProject.load import *
+from load import *
 import math
 import json
 

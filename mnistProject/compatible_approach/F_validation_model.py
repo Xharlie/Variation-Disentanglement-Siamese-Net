@@ -1,5 +1,5 @@
 import sys
-sys.path.append("./")
+sys.path.append("../")
 from neural_helper import *
 import model
 
@@ -25,6 +25,10 @@ class F_validation(model.VDSN):
             dim_F_I=dim_F_I,
             split_encoder = split_encoder)
 
+        self.discrim_W1 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='discrim_W1')
+        self.discrim_b1 = bias_variable([self.dim_F_V], name='dis_b1')
+        self.discrim_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_y], stddev=0.02), name='discrim_W2')
+        self.discrim_b2 = bias_variable([self.dim_y], name='dis_b2')
 
     def build_model(self, feature_selection='F_V', dis_regularizer_weight=1):
         '''

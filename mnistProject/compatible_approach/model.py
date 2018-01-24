@@ -12,7 +12,7 @@ import copy
 class VDSN(object):
     def __init__(
             self,
-            batch_size=100,
+            batch_size=64,
             image_shape=[28, 28, 1],
             dim_y=10,
             dim_W1=128,
@@ -22,7 +22,8 @@ class VDSN(object):
             metric_obj_func='central',
             train_bn = False,
             soft_bn = False,
-            split_encoder = True
+            split_encoder = True,
+            metric_norm = 2
     ):
         self.runing_avg = np.zeros((dim_y, dim_F_I))
         self.is_training = True
@@ -39,6 +40,7 @@ class VDSN(object):
         self.dim_W3 = dim_W3
         # disentangle_obj_func = negative_log (-logD(x)), one_minus(log(1-D(x))) or hybrid
         self.metric_obj_func = metric_obj_func
+        self.metric_norm = metric_norm
 
         self.gen_W1 = tf.Variable(tf.random_normal([dim_W1, dim_W2 * 7 * 7], stddev=0.02), name='generator_W1')
         self.gen_b1 = bias_variable([self.dim_W2 * 7 * 7], name='gen_b1')
@@ -60,167 +62,215 @@ class VDSN(object):
             self.encoder_b2 = bias_variable([dim_W2], name='en_b2')
             self.encoder_b3 = bias_variable([dim_W1], name='en_b3')
 
+        self.filter_W1 = tf.Variable(tf.random_normal([self.dim_F_I + self.dim_F_V, self.dim_F_V], stddev=0.02), name='filter_W1')
+        self.filter_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V / 2], stddev=0.02), name='filter_W2')
+        self.filter_W3 = tf.Variable(tf.random_normal([self.dim_F_V / 2, self.dim_F_V], stddev=0.02), name='filter_W3')
+
         self.classifier_W1 = tf.Variable(tf.random_normal([self.dim_F_I, self.dim_y], stddev=0.02), name='classif_W1')
         self.classifier_b1 = bias_variable([self.dim_y], name='cla_b1')
 
-        self.gan_dis_W1 = tf.Variable(tf.random_normal([5, 5, image_shape[-1], dim_W3], stddev=0.02),
-                                      name='gan_discrim_W1')
-        self.gan_dis_W2 = tf.Variable(tf.random_normal([5, 5, dim_W3, dim_W2], stddev=0.02), name='gan_discrim_W2')
-        self.gan_dis_W3 = tf.Variable(tf.random_normal([dim_W2 * 7 * 7, dim_W1], stddev=0.02), name='gan_discrim_W3')
-        self.gan_dis_W4 = tf.Variable(tf.random_normal([dim_W1, dim_y + 1], stddev=0.02), name='gan_discrim_W4')
-        self.gan_dis_b1 = bias_variable([dim_W3], name='gan_dis_b1')
-        self.gan_dis_b2 = bias_variable([dim_W2], name='gan_dis_b2')
-        self.gan_dis_b3 = bias_variable([dim_W1], name='gan_dis_b3')
-        self.gan_dis_b4 = bias_variable([dim_y + 1], name='gan_dis_b4')
+        self.gan_dis_W1 = tf.Variable(tf.random_normal([self.dim_F_I + self.dim_F_V, self.dim_F_V], stddev=0.02), name='gan_discrim_W1')
+        self.gan_dis_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V], stddev=0.02), name='gan_discrim_W2')
+        self.gan_dis_W3 = tf.Variable(tf.random_normal([self.dim_F_V, 1], stddev=0.02), name='gan_discrim_W3')
 
         self.even_label = tf.convert_to_tensor(np.ones((self.batch_size, self.dim_y)) / self.dim_y)
 
-    def build_model(self, gen_metric_loss_weight=1, gen_regularizer_weight=1,
-                    gen_cla_weight=1):
+    def build_model(self, gen_metric_loss_weight=1, gen_regularizer_weight=0.01,
+                    gen_cla_weight=1, gan_gen_weight = 1, F_IV_recon_weight = 1, F_I_gen_recon_weight = 1):
 
         '''
          Y for class label
         '''
         Y_left = tf.placeholder(tf.float32, [None, self.dim_y])
         Y_right = tf.placeholder(tf.float32, [None, self.dim_y])
+        Y_diff = tf.placeholder(tf.float32, [None, self.dim_y])
+
         F_I_center_left = tf.placeholder(tf.float32, [None, self.dim_F_I])
         F_I_center_right = tf.placeholder(tf.float32, [None, self.dim_F_I])
+        F_I_center_diff = tf.placeholder(tf.float32, [None, self.dim_F_I])
 
         image_real_left = tf.placeholder(tf.float32, [None] + self.image_shape)
         image_real_right = tf.placeholder(tf.float32, [None] + self.image_shape)
+        image_real_diff = tf.placeholder(tf.float32, [None] + self.image_shape)
+
         #  F_V for variance representation
         #  F_I for identity representation
         F_I_left, F_V_left = self.encoder(image_real_left, reuse=False)
         F_I_right, F_V_right = self.encoder(image_real_right, reuse=True)
+        F_I_diff, F_V_diff = self.encoder(image_real_diff, reuse=True)
 
-        gen_metric_loss = (tf.norm(F_I_left - F_I_center_left, ord = 1)
-                           + tf.norm(F_I_right - F_I_center_right, ord = 1)) / self.batch_size
-        h3_right = self.generator(F_I_left, F_V_right, reuse=False)
-        h3_left = self.generator(F_I_right, F_V_left, reuse=True)
+        gen_metric_loss = (tf.norm(F_I_left - F_I_center_left, ord = self.metric_norm)
+                           + tf.norm(F_I_right - F_I_center_right, ord = self.metric_norm)
+                          + tf.norm(F_I_diff - F_I_center_diff, ord = self.metric_norm)) / (3 * self.batch_size)
 
-        image_gen_left = tf.nn.sigmoid(h3_left)
-        image_gen_right = tf.nn.sigmoid(h3_right)
+        image_gen_left = tf.nn.sigmoid(self.generator(F_I_right, F_V_left, reuse=False))
+        image_gen_right = tf.nn.sigmoid(self.generator(F_I_left, F_V_right, reuse=True))
+
+        image_gen_left_diff = tf.nn.sigmoid(self.generator(F_I_left, F_V_diff, reuse=True))
+        image_gen_diff_right = tf.nn.sigmoid(self.generator(F_I_diff, F_V_right, reuse=True))
+
+        F_I_left_gen, _ = self.encoder(image_gen_left_diff, reuse=True)
+        F_I_diff_gen, _ = self.encoder(image_gen_diff_right, reuse=True)
+
+        F_I_gen_recon_cost = (tf.nn.l2_loss(F_I_left - F_I_left_gen)
+                              + tf.nn.l2_loss(F_I_diff - F_I_diff_gen)) / (2 * self.batch_size)
 
         Y_cla_logits_left = self.classifier(F_I_left, reuse=False)
         Y_cla_logits_right = self.classifier(F_I_right, reuse=True)
+        Y_cla_logits_diff = self.classifier(F_I_diff, reuse=True)
 
         gen_cla_correct_prediction_left = tf.equal(tf.argmax(Y_cla_logits_left, 1), tf.argmax(Y_left, 1))
-        gen_cla_accuracy_left = tf.reduce_mean(tf.cast(gen_cla_correct_prediction_left, tf.float32))
 
         gen_cla_correct_prediction_right = tf.equal(tf.argmax(Y_cla_logits_right, 1), tf.argmax(Y_right, 1))
-        gen_cla_accuracy_right = tf.reduce_mean(tf.cast(gen_cla_correct_prediction_right, tf.float32))
+
+        gen_cla_correct_prediction_diff = tf.equal(tf.argmax(Y_cla_logits_diff, 1), tf.argmax(Y_diff, 1))
 
         gen_vars = filter(lambda x: x.name.startswith('generator'), tf.trainable_variables())
         encoder_vars = filter(lambda x: x.name.startswith('encoder'), tf.trainable_variables())
         classifier_vars = filter(lambda x: x.name.startswith('classif'), tf.trainable_variables())
         gan_discriminator_vars = filter(lambda x: x.name.startswith('gan_discrim'), tf.trainable_variables())
+        filter_vars = filter(lambda x: x.name.startswith('filter'), tf.trainable_variables())
 
         regularizer = tf.contrib.layers.l2_regularizer(0.1)
         gen_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list=gen_vars + encoder_vars + classifier_vars)
 
+        gan_filter_regularization_loss = tf.contrib.layers.apply_regularization(
+            regularizer, weights_list=filter_vars)
+
         gan_dis_regularization_loss = tf.contrib.layers.apply_regularization(
             regularizer, weights_list=gan_discriminator_vars)
 
-        shape =  self.batch_size #* self.image_shape[0] * self.image_shape[1]
-        gen_recon_cost_left = tf.nn.l2_loss(image_real_left - image_gen_left) / shape
-        gen_recon_cost_right = tf.nn.l2_loss(image_real_right - image_gen_right) / shape
+        shape = self.batch_size #* self.image_shape[0] * self.image_shape[1]
+        gen_recon_cost = (tf.nn.l2_loss(image_real_left - image_gen_left) +
+                          tf.nn.l2_loss(image_real_right - image_gen_right)) / (2 * shape)
+        gen_cla_cost = (tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(labels=Y_left, logits=Y_cla_logits_left)) +
+                        tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(labels=Y_right, logits=Y_cla_logits_right)) +
+                        tf.reduce_mean(
+                            tf.nn.softmax_cross_entropy_with_logits(labels=Y_diff, logits=Y_cla_logits_diff))
+        ) / 3
 
-        gen_cla_cost_left = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(labels=Y_left, logits=Y_cla_logits_left))
-        gen_cla_cost_right = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(labels=Y_right, logits=Y_cla_logits_right))
-
-        gen_recon_cost = (gen_recon_cost_left + gen_recon_cost_right) / 2
-        gen_cla_cost = (gen_cla_cost_left + gen_cla_cost_right) / 2
-        gen_total_cost = gen_recon_cost \
+        gen_total_cost = gen_recon_cost + F_I_gen_recon_weight * F_I_gen_recon_cost \
                          + gen_metric_loss_weight * gen_metric_loss \
                          + gen_cla_weight * gen_cla_cost \
                          + gen_regularizer_weight * gen_regularization_loss
-        gen_cla_accuracy = (gen_cla_accuracy_left + gen_cla_accuracy_right) / 2
 
-        #### GAN LOSS
-        Y_real_right = tf.concat(axis=1, values=(Y_right, tf.zeros([tf.shape(Y_right)[0], 1])))
-        Y_real_left = tf.concat(axis=1, values=(Y_left, tf.zeros([tf.shape(Y_left)[0], 1])))
-        gan_gen_cost = (self.GAN_discriminator(image_gen_left, Y_real_right, reuse=False)
-                        + self.GAN_discriminator(image_gen_right, Y_real_left, reuse=True)) / 2
-        gan_gen_FV_cost = (tf.nn.l2_loss(self.encoder(image_gen_left, reuse=True)[1] - F_V_left) + \
-                          tf.nn.l2_loss(self.encoder(image_gen_right, reuse=True)[1] - F_V_right)) / self.batch_size / self.dim_F_V
-        Y_fake_left = tf.concat(axis=1, values=(tf.zeros([tf.shape(Y_right)[0], self.dim_y]),
-                                                tf.ones([tf.shape(Y_right)[0], 1])))
-        Y_fake_right = tf.concat(axis=1, values=(tf.zeros([tf.shape(Y_left)[0], self.dim_y]),
-                                                 tf.ones([tf.shape(Y_left)[0], 1])))
+        gen_cla_accuracy = (tf.reduce_mean(tf.cast(gen_cla_correct_prediction_left, tf.float32)) +
+                            tf.reduce_mean(tf.cast(gen_cla_correct_prediction_right, tf.float32)) +
+                            tf.reduce_mean(tf.cast(gen_cla_correct_prediction_diff, tf.float32))) / 3
 
-        gan_dis_cost_gen = (self.GAN_discriminator(image_gen_left, Y_fake_left, reuse=True)
-                            + self.GAN_discriminator(image_gen_right, Y_fake_right, reuse=True)) / 2
-        gan_dis_cost_real = (self.GAN_discriminator(image_real_left, Y_real_left, reuse=True)
-                             + self.GAN_discriminator(image_real_right, Y_real_right, reuse=True)) / 2
-        gan_dis_cost = gan_dis_cost_real + gan_dis_cost_gen \
-                       + gen_regularizer_weight * gan_dis_regularization_loss
+        #### Filter and GAN LOSS
+        F_IV_left_left = self.filter(F_I_left, F_V_left, reuse=False)
+        F_IV_left_right = self.filter(F_I_left, F_V_right, reuse=True)
+        F_IV_left_diff = self.filter(F_I_left, F_V_diff, reuse=True)
+        F_IV_right_left = self.filter(F_I_right, F_V_left, reuse=True)
+        F_IV_right_diff = self.filter(F_I_right, F_V_diff, reuse=True)
+        F_IV_diff_left = self.filter(F_I_diff, F_V_left, reuse=True)
 
-        gan_total_cost = gan_gen_cost + 8 * gan_gen_FV_cost + \
-                         + gen_metric_loss_weight * gen_metric_loss \
-                         + gen_cla_weight * gen_cla_cost \
-                         + gen_regularizer_weight * gen_regularization_loss
+        disc_comp = tf.concat((self.GAN_discriminator(F_I_left, F_V_right, reuse=False),
+                               self.GAN_discriminator(F_I_right, F_V_left, reuse=True)), axis=0)
+
+        disc_incomp = tf.concat((self.GAN_discriminator(F_I_left, F_IV_left_diff, reuse=True),
+                                self.GAN_discriminator(F_I_right, F_IV_right_diff, reuse=True)), axis=0)
+
+        gan_gen_cost = - tf.reduce_mean(disc_incomp)
+        gan_dis_cost = tf.reduce_mean(disc_incomp) - tf.reduce_mean(disc_comp)
+
+        alpha = tf.random_uniform(
+            shape=[self.batch_size, 1],
+            minval=0.,
+            maxval=1.
+        )
+        differences = F_IV_right_diff - F_V_left
+        interpolates = F_V_left + (alpha * differences)
+        gradients = tf.gradients(self.GAN_discriminator(F_I_right, interpolates, reuse=True), [interpolates])[0]
+        slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=[1]))
+        gradient_penalty = tf.reduce_mean((slopes - 1.) ** 2)
+        gan_dis_cost += 10 * gradient_penalty
+
+        F_IV_recon_cost = (tf.nn.l2_loss(F_V_left - F_IV_left_left) + tf.nn.l2_loss(F_V_left - F_IV_right_left) +
+                           tf.nn.l2_loss(F_V_right - F_IV_left_right)) / (3 * self.batch_size)
+
+        gan_dis_total_cost = gan_dis_cost + gen_regularizer_weight * gan_dis_regularization_loss
+
+        gan_gen_total_cost = gen_total_cost + gan_gen_weight * gan_gen_cost + F_IV_recon_weight * F_IV_recon_cost + \
+                         gen_regularizer_weight * gan_filter_regularization_loss
 
         val_recon_img = tf.placeholder(tf.float32, [None, self.image_shape[0] * int(math.ceil(self.batch_size ** (.5))),
+                 self.image_shape[1] * 3 * int(math.ceil(self.batch_size / math.ceil(self.batch_size ** (.5)))), 3])
+        F_I_cluster_img = tf.placeholder(tf.float32, [None, 480, 640, 3])
+        F_V_cluster_img = tf.placeholder(tf.float32, [None, 480, 640, 3])
+        F_I_right_IV_right_left_gen_out = tf.nn.sigmoid(self.generator(F_I_right, F_IV_right_left, reuse=True))
+        F_I_diff_IV_diff_left_gen_out = tf.nn.sigmoid(self.generator(F_I_diff, F_IV_diff_left, reuse=True))
+        F_I_diff_V_left_gen_out = tf.nn.sigmoid(self.generator(F_I_diff, F_V_left, reuse=True))
+        F_IV_out_diff_stitch_img = tf.placeholder(tf.float32, [None, self.image_shape[0] * int(math.ceil(self.batch_size ** (.5))),
+                 self.image_shape[1] * 3 * int(math.ceil(self.batch_size / math.ceil(self.batch_size ** (.5)))), 3])
+        F_IV_out_same_stitch_img = tf.placeholder(tf.float32, [None, self.image_shape[0] * int(math.ceil(self.batch_size ** (.5))),
+                 self.image_shape[1] * 3 * int(math.ceil(self.batch_size / math.ceil(self.batch_size ** (.5)))), 3])
+        F_V_out_diff_stitch_img = tf.placeholder(tf.float32, [None, self.image_shape[0] * int(math.ceil(self.batch_size ** (.5))),
                  self.image_shape[1] * 3 * int(math.ceil(self.batch_size / math.ceil(self.batch_size ** (.5)))), 3])
         summary_gen_recon_cost = tf.summary.scalar('gen_recon_cost', gen_recon_cost)
         summary_gen_metric_cost = tf.summary.scalar('gen_metric_cost', gen_metric_loss)
         summary_gen_total_cost = tf.summary.scalar('gen_total_cost', gen_total_cost)
         summary_gen_cla_accuracy = tf.summary.scalar('gen_cla_accuracy', gen_cla_accuracy)
         summary_gan_dis_cost = tf.summary.scalar('gan_dis_cost', gan_dis_cost)
-        summary_gan_gen_FV_cost = tf.summary.scalar('gan_gen_FV_cost', gan_gen_FV_cost)
         summary_gan_gen_cost = tf.summary.scalar('gan_gen_cost', gan_gen_cost)
-        summary_gan_total_cost = tf.summary.scalar('gan_total_cost', gan_total_cost)
+        summary_F_I_gen_recon_cost = tf.summary.scalar('F_I_gen_recon_cost', F_I_gen_recon_cost)
+        summary_F_IV_recon_cost = tf.summary.scalar('F_IV_recon_cost', F_IV_recon_cost)
+        summary_gan_gen_total_cost = tf.summary.scalar('gan_gen_total_cost', gan_gen_total_cost)
         summary_val_recon_img = tf.summary.image('val_recon_img',val_recon_img)
+        summary_F_IV_out_diff_stitch_img = tf.summary.image('F_IV_out_diff_stitch_img', F_IV_out_diff_stitch_img)
+        summary_F_IV_out_same_stitch_img = tf.summary.image('F_IV_out_same_stitch_img', F_IV_out_same_stitch_img)
+        summary_F_V_out_diff_stitch_img = tf.summary.image('F_V_out_diff_stitch_img', F_V_out_diff_stitch_img)
+        summary_F_I_cluster_img = tf.summary.image('F_I_cluster_img', F_I_cluster_img)
+        summary_F_V_cluster_img = tf.summary.image('F_V_cluster_img', F_V_cluster_img)
         summary_merge_scalar = tf.summary.merge(
             [summary_gen_recon_cost, summary_gen_metric_cost, summary_gen_total_cost,
              summary_gen_cla_accuracy, summary_gan_dis_cost, summary_gan_gen_cost,
-             summary_gan_gen_FV_cost,summary_gan_total_cost])
+             summary_gan_gen_total_cost, summary_F_I_gen_recon_cost])
         summary_gen_merge_scalar = tf.summary.merge([summary_gen_recon_cost, summary_gen_metric_cost, summary_gen_total_cost,
-           summary_gen_cla_accuracy])
+           summary_gen_cla_accuracy, summary_F_I_gen_recon_cost])
         summary_gan_gen_merge_scalar = tf.summary.merge([summary_gen_recon_cost, summary_gen_metric_cost, summary_gen_cla_accuracy,
-                                                     summary_gan_gen_cost, summary_gan_gen_FV_cost, summary_gan_total_cost])
+                        summary_F_I_gen_recon_cost, summary_gan_gen_cost, summary_gan_gen_total_cost, summary_F_IV_recon_cost])
         summary_gan_dis_merge_scalar = tf.summary.merge([summary_gan_dis_cost])
-        summary_merge_img = tf.summary.merge([summary_val_recon_img])
-        return Y_left, Y_right, image_real_left, image_real_right, gen_recon_cost, gen_metric_loss, \
+        summary_merge_recon_img = tf.summary.merge([summary_val_recon_img,summary_F_V_out_diff_stitch_img])
+        summary_merge_stitch_img = tf.summary.merge([
+            summary_F_IV_out_diff_stitch_img, summary_F_IV_out_same_stitch_img])
+        summary_merge_cluster_img = tf.summary.merge([summary_F_I_cluster_img])
+        return Y_left, Y_right, Y_diff, image_real_left, image_real_right, image_real_diff, gen_recon_cost, gen_metric_loss, \
                gen_cla_cost, gen_total_cost, image_gen_left, image_gen_right, gen_cla_accuracy, F_I_left, F_V_left, \
-               gan_gen_cost, gan_dis_cost, gan_total_cost, val_recon_img, F_I_center_left, F_I_center_right,  F_I_left, F_I_right, \
-               summary_merge_scalar, summary_gen_merge_scalar, summary_gan_gen_merge_scalar, summary_gan_dis_merge_scalar, summary_merge_img
+               gan_gen_cost, F_IV_recon_cost, gan_dis_total_cost, gan_gen_total_cost, val_recon_img, F_I_cluster_img, F_V_cluster_img, \
+               F_I_center_left, F_I_center_right, F_I_center_diff, F_I_right, F_V_right, F_I_right_IV_right_left_gen_out, \
+               F_I_diff_IV_diff_left_gen_out,F_I_diff_V_left_gen_out, F_IV_out_diff_stitch_img, F_IV_out_same_stitch_img, \
+               F_V_out_diff_stitch_img, summary_merge_scalar, summary_gen_merge_scalar,summary_gan_gen_merge_scalar, \
+               summary_gan_dis_merge_scalar, summary_merge_recon_img, summary_merge_cluster_img, summary_merge_stitch_img
 
-    def GAN_discriminator(self, image, Y, reuse=False):
+    def filter(self, F_I, F_V, reuse=False):
+        with tf.name_scope('filter_fc1'):
+            h_fc1 = lrelu(batchnormalize(tf.matmul(tf.concat((F_I, F_V), axis=1), self.filter_W1)
+                                         , 'filter_bn1', soft=self.soft_bn, train=self.is_training,
+                                         reuse=reuse, valid=self.train_bn))
+        with tf.name_scope('filter_fc2'):
+            h_fc2 = lrelu(batchnormalize(tf.matmul(h_fc1, self.filter_W2)
+                                         , 'filter_bn2', soft=self.soft_bn, train=self.is_training,
+                                         reuse=reuse, valid=self.train_bn))
+        with tf.name_scope('filter_fc3'):
+            h_fc3 = batchnormalize(lrelu(tf.matmul(h_fc2, self.filter_W3))
+                                         , 'filter_bn3', soft=self.soft_bn, train=self.is_training,
+                                         reuse=reuse, valid=self.train_bn)
+        return h_fc3
+
+
+    def GAN_discriminator(self, F_I, F_V, reuse=False):
         # First convolutional layer - maps one grayscale image to 64 feature maps.
-        with tf.name_scope('gan_dis_conv1'):
-            h_conv1 = lrelu(
-                tf.nn.conv2d(image, self.gan_dis_W1, strides=[1, 1, 1, 1], padding='SAME') + self.gan_dis_b1)
-        # First pooling layer - downsamples by 2X.
-        with tf.name_scope('gan_dis_pool1'):
-            h_pool1 = avg_pool_2x2(h_conv1)
-
-        # Second convolutional layer -- maps 64 feature maps to 128.
-        with tf.name_scope('gan_dis_conv2'):
-            h_conv2 = tf.nn.conv2d(h_pool1, self.gan_dis_W2, strides=[1, 1, 1, 1], padding='SAME')  # + self.gan_dis_b2
-            h_conv2 = lrelu(batchnormalize(h_conv2, 'gan_dis_bn1', train=self.is_training, reuse=reuse,
-                                           soft = self.soft_bn, valid = self.train_bn))
-
-        # Second pooling layer.
-        with tf.name_scope('gan_dis_pool2'):
-            h_pool2 = avg_pool_2x2(h_conv2)
-
-        # Fully connected layer 1 -- after 2 round of downsampling, our 28x28 image
-        # is down to 7x7x64 feature maps -- maps this to 1024 features.
         with tf.name_scope('gan_dis_fc1'):
-            h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
-            h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.gan_dis_W3)  # + self.gan_dis_b3
-                                         , 'gan_dis_bn2', soft = self.soft_bn, train=self.is_training,
-                                         reuse=reuse, valid = self.train_bn))
-
+            h_fc1 = lrelu(tcl.layer_norm(tf.matmul(tf.concat((F_I, F_V), axis=1), self.gan_dis_W1)))
         with tf.name_scope('gan_dis_fc2'):
-            h_fc2 = tf.matmul(h_fc1, self.gan_dis_W4) + self.gan_dis_b4
+            h_fc2 = lrelu(tcl.layer_norm(tf.matmul(h_fc1, self.gan_dis_W2)))
 
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=h_fc2))
-        return loss
+        return tf.matmul(h_fc2, self.gan_dis_W3)
 
     def gen_disentangle_cost(self, label, logits):
         if self.disentangle_obj_func == 'negative_log':

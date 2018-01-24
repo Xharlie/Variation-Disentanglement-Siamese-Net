@@ -1,11 +1,69 @@
 
 ---------------------- classification validation -------------------------
-python -u classification_validation.py --not_split_encoder --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/model_treasury/2017-11-23-16-18-17/model.ckpt --feature_selection F_I --F_validation_test_batch_size 128
+python -u classification_validation.py --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/compatible_approach/model_treasury/2018-01-18-19-45-07/model.ckpt --feature_selection F_I --F_validation_test_batch_size 128
 
-python -u classification_validation.py --not_split_encoder --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/model_treasury/2017-12-29-21-45-30/model.ckpt --feature_selection F_V --F_validation_test_batch_size 128
+python -u classification_validation.py --F_validation_n_epochs 10 --save_path /home/xharlie/Variation-Disentanglement-Siamese-Net/mnistProject/compatible_approach/model_treasury/2018-01-18-19-45-07/model.ckpt --feature_selection F_V --F_validation_test_batch_size 128
+
+----------------------- clustering ----------------------------
+
+python -u cluster_train.py --pretrain_model_time_dir 2018-01-18-19-45-07
 
 ----------------- dynamic cost function + split encoder + less summary------------------------
+--avg_momentum 0.05 --gen_metric_loss_weight 1 --gen_cla_weight 5
+nohup python -u train.py --avg_momentum 0.05 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 1 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric1_cla5 &
+2018-01-20-16-25-59
+
+--avg_momentum 0.01 --gen_metric_loss_weight 1 --gen_cla_weight 5
+nohup python -u train.py --avg_momentum 0.01 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 1 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.01_bntrue_splitencoder_metric1_cla5 &
+2018-01-20-16-26-02
+
+--avg_momentum 0.01 --gen_metric_loss_weight 5 --gen_cla_weight 5
+nohup python -u train.py --avg_momentum 0.01 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 5 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.01_bntrue_splitencoder_metric5_cla5 &
+2018-01-20-16-26-20
+
+--avg_momentum 0.05 --gen_metric_loss_weight 5 --gen_cla_weight 5
+nohup python -u train.py --avg_momentum 0.05 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 5 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric5_cla5 &
+2018-01-20-16-26-26
+
+--avg_momentum 0.05 --gen_metric_loss_weight 10 --gen_cla_weight 5
+nohup python -u train.py --avg_momentum 0.05 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 10 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric10_cla5 &
+2018-01-20-16-26-32
+
+--avg_momentum 0.05 --gen_metric_loss_weight 5 --gen_cla_weight 5 --metric_norm 1
+nohup python -u train.py --avg_momentum 0.05 --metric_norm 1 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 5 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric5_cla5_n1 &
+2018-01-20-16-27-29
+
+--avg_momentum 0.05 --gen_metric_loss_weight 5 --gen_cla_weight 10
+nohup python -u train.py --avg_momentum 0.05 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 5 --gen_cla_weight 10 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric5_cla10 &
+2018-01-20-16-27-30
+
+--avg_momentum 0.05 --gen_metric_loss_weight 0 --gen_cla_weight 5
+nohup python -u train.py --avg_momentum 0.05 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 0 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric0_cla5 &
+2018-01-20-16-27-37
+
+--avg_momentum 0.05 --gen_metric_loss_weight 5 --gen_cla_weight 0
+nohup python -u train.py --avg_momentum 0.05 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 5 --gen_cla_weight 0 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric5_cla0 &
+2018-01-20-16-27-43
+
+--avg_momentum 0.05 --gen_metric_loss_weight 40 --gen_cla_weight 5
+nohup python -u train.py --avg_momentum 0.05 --drawing_epoch 10 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 500 --gan_decay_step 10000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --gen_metric_loss_weight 40 --gen_cla_weight 5 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_bntrue_splitencoder_metric40_cla5 &
+2018-01-20-16-26-26
+
+tensorboard --logdir=mom0.05_met1_cla5:2018-01-20-16-25-59,mom0.01_met1_cla5:2018-01-20-16-26-02,mom0.01_met5_cla5:2018-01-20-16-26-20,mom0.05_met5_cla5:2018-01-20-16-26-26,mom0.05_met10_cla5:2018-01-20-16-26-32,mom0.05_met5_cla5_n1:2018-01-20-16-27-29,mom0.05_met5_cla10:2018-01-20-16-27-30,mom0.05_met0_cla5:2018-01-20-16-27-37,mom0.05_met5_cla0:2018-01-20-16-27-43,mom0.05_met40_cla5:2018-01-20-16-26-26
 
 
+------------------ with gan --------------------
 
-nohup python -u train.py --avg_momentum 0.05 --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 1000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --n_epochs 50 --gan_decay_step 1000 --gan_decay_rate 0.99 --gan_series 0 --recon_series 1 --F_V_validation_test_batch_size 64 &> train.1.0.central.momen0.05_train_bntrue_splitencoder &
+--avg_momentum 0.05 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 1 --F_IV_recon_weight 1 --F_I_gen_recon_weight 1
+nohup python -u train.py --recon_epoch 40 --gan_epoch 60 --avg_momentum 0.05 --drawing_epoch 5 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --gan_decay_step 10000 --gan_decay_rate 0.99 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 1 --F_IV_recon_weight 1 --F_I_gen_recon_weight 1 --F_V_validation_test_batch_size 64 &> train.40.60.central.momen0.05_bntrue_splitencoder_metric10_cla5_gan1_ivrecon_1_irecon_1
+2018-01-21-21-30-25
+
+
+--avg_momentum 0.05 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 1 --F_IV_recon_weight 1 --F_I_gen_recon_weight 1
+nohup python -u train.py --recon_epoch 100 --gan_epoch 0 --avg_momentum 0.05 --drawing_epoch 5 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --gan_decay_step 10000 --gan_decay_rate 0.99 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 1 --F_IV_recon_weight 1 --F_I_gen_recon_weight 1 --F_V_validation_test_batch_size 64 &> train.100.0.central.momen0.05_bntrue_splitencoder_metric10_cla5_gan1_ivrecon_1_irecon_1
+2018-01-21-22-59-24
+
+
+--avg_momentum 0.05 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 2 --F_IV_recon_weight 1 --F_I_gen_recon_weight 2
+nohup python -u train.py --recon_epoch 100 --gan_epoch 500 --avg_momentum 0.05 --drawing_epoch 5 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --gan_decay_step 10000 --gan_decay_rate 0.99 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 2 --F_IV_recon_weight 1 --F_I_gen_recon_weight 2 --F_V_validation_test_batch_size 64 &> train.100.500.central.momen0.05_bntrue_splitencoder_metric10_cla5_gan2_ivrecon_1_irecon_2
+2018-01-24-14-19-33

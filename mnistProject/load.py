@@ -4,7 +4,7 @@ sys.path.append('..')
 import numpy as np
 import os
 
-data_dir = '../../data/'
+data_dir = os.path.dirname(os.path.abspath(__file__)) + '/../data/'
 def mnist():
     fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
     loaded = np.fromfile(file=fd,dtype=np.uint8)
