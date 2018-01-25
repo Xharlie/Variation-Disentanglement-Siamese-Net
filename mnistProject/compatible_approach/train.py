@@ -70,8 +70,8 @@ parser.add_argument("--gan_epoch", nargs='?', type=int, default=60,
 parser.add_argument("--drawing_epoch", nargs='?', type=int, default=1,
                     help="how many epochs to draw a comparision pic")
 
-parser.add_argument("--save_step", nargs='?', type=int, default=20000,
-                    help="how many steps to save")
+parser.add_argument("--save_epoch", nargs='?', type=int, default=50,
+                    help="how many epoch to save")
 
 parser.add_argument("--gen_regularizer_weight", nargs='?', type=float, default=0.01,
                     help="generator regularization weight")
@@ -145,6 +145,16 @@ parser.add_argument("--clustering_tsb", action="store_true",
 parser.add_argument("--not_split_encoder", action="store_true",
                         help="use moving in training")
 
+parser.add_argument("--F_I_batch_norm", action="store_true",
+                        help="use batch_norm in F_I")
+
+parser.add_argument("--F_V_limit_variance", action="store_true",
+                        help="limit variance for in F_V")
+
+parser.add_argument("--F_multiply", action="store_true",
+                        help="limit variance for in F_V")
+
+
 # >==================  F_V_validation args =======================<
 
 parser.add_argument("--F_V_validation_logs_dir_root", nargs='?', type=str, default='F_V_validation/',
@@ -211,7 +221,10 @@ VDSN_model = VDSN(
         train_bn= args.train_bn,
         soft_bn= args.soft_bn,
         split_encoder = (not args.not_split_encoder),
-        metric_norm = args.metric_norm
+        metric_norm = args.metric_norm,
+        F_I_batch_norm = args.F_I_batch_norm,
+        F_V_limit_variance = args.F_V_limit_variance,
+        F_multiply = args.F_multiply
 )
 
 Y_left, Y_right, Y_diff, image_real_left, image_real_right, image_real_diff, gen_recon_cost, gen_metric_loss, \
@@ -239,6 +252,7 @@ if args.train_bn:
     gan_dis_vars = filter(lambda x: x.name.startswith('gan'), tf.trainable_variables())
     # include en_* and encoder_* W and b,
     encoder_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
+    dup_encoder_vars = filter(lambda x: x.name.startswith('dup_en'), tf.trainable_variables())
     filter_vars = filter(lambda x: x.name.startswith('fil'), tf.trainable_variables())
 
 else:
@@ -246,7 +260,11 @@ else:
     cla_vars = filter(lambda x: x.name.startswith('cla') and 'bn' not in x.name, tf.trainable_variables())
     gan_dis_vars = filter(lambda x: x.name.startswith('gan') and 'bn' not in x.name, tf.trainable_variables())
     encoder_vars = filter(lambda x: x.name.startswith('en') and 'bn' not in x.name, tf.trainable_variables())
+    dup_encoder_vars = filter(lambda x: x.name.startswith('dup_en'), tf.trainable_variables())
     filter_vars = filter(lambda x: x.name.startswith('fil') and 'bn' not in x.name, tf.trainable_variables())
+
+fix_vars = filter_vars = filter(lambda x: x.name.startswith('fix'), tf.trainable_variables())
+dup_fix_vars = filter_vars = filter(lambda x: x.name.startswith('dup_fix'), tf.trainable_variables())
 
 with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
     train_op_gen = tf.train.AdamOptimizer(
@@ -346,6 +364,11 @@ with sess.as_default():
 
             print "epoch:", epoch
             while end <= len(trY):
+                sess.run(tf.get_collection('update_dup'))
+                # print "dup_encoder_vars", sess.run(dup_encoder_vars[2])
+                # print "encoder_vars", sess.run(encoder_vars[2])
+                # print "dup_fix_vars", sess.run(dup_fix_vars[2])
+                # print "fix_vars", sess.run(fix_vars[2])
 
                 Xs_left = trX[index_left[start:end]].reshape([-1, 28, 28, 1]) / 255.
                 Ys_left = OneHot(trY[index_left[start:end]], 10)
@@ -361,7 +384,9 @@ with sess.as_default():
                 Ys_diff = OneHot(Y_diff_index, 10)
                 Xs_diff = Xs_diff.reshape([-1, 28, 28, 1]) / 255.
 
+
                 if epoch < args.recon_epoch:
+
                     _, summary, gen_recon_cost_val, gen_metric_loss_val, gen_cla_cost_val, gen_total_cost_val, \
                     gen_cla_accuracy_val, F_I_left_val, F_I_right_val \
                         = sess.run(
@@ -397,6 +422,7 @@ with sess.as_default():
                         bn4_gamma = filter(lambda x: x.name.startswith('fix_scale_en_bn4/gamma'), tf.all_variables())[0]
                         print("fix_scale_en_bn3 beta/gamma:" + str(sess.run(bn3_beta)) + "/"+str(sess.run(bn3_gamma)))
                         print("fix_scale_en_bn4 beta/gamma:" + str(sess.run(bn4_beta)) + "/"+str(sess.run(bn4_gamma)))
+
                 else:
                     # start to train gan, D first
                     modulus = np.mod(iterations, args.critics_iters)
@@ -462,10 +488,7 @@ with sess.as_default():
                 start += batch_size
                 end += batch_size
                 iterations += 1
-                if np.mod(iterations, args.save_step) == 0 and iterations >= args.save_step:
-                    save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
-                    print("Model saved in file: %s" % save_path)
-            #         draw pic every n epoch
+                            #         draw pic every n epoch
             if np.mod(epoch, args.drawing_epoch) == 0:
                 X_right, _ = randomPickRight(0, visualize_dim, vaX, vaY, indexTableVal)
                 X_right = X_right.reshape([-1, 28, 28, 1]) / 255
@@ -550,18 +573,21 @@ with sess.as_default():
                     add_tensorboard(image_real_left_agg, vaY[0: len(vaY)], F_I_matrix_agg, F_V_matrix_agg,
                                       time_dir, iterations)
                 VDSN_model.is_training = True
+            if np.mod(epoch, args.save_epoch) == 0 and epoch > 0:
+                save_path = saver.save(sess, "{}model.ckpt".format(model_dir), global_step=global_step)
+                print("Model saved in file: %s" % save_path)
             np.random.shuffle(index_left)
             start, end = resetIndex()
             epoch += 1
 
         # Save the variables to disk.
-        save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
+        save_path = saver.save(sess, "{}model.ckpt".format(model_dir), global_step=global_step)
         print("Model saved in file: %s" % save_path)
 
     except KeyboardInterrupt:
         print("Manual interrupt occurred.")
         print('Done training for {} steps'.format(iterations))
-        save_path = saver.save(sess, "{}model.ckpt".format(model_dir, global_step=global_step))
+        save_path = saver.save(sess, "{}model.ckpt".format(model_dir), global_step=global_step)
         print("Model saved in file: %s" % save_path)
         with open(training_logs_dir + 'step' + str(iterations) + '_parameter.txt', 'w') as file:
             json.dump(vars(args), file)

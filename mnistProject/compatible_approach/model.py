@@ -23,11 +23,17 @@ class VDSN(object):
             train_bn = False,
             soft_bn = False,
             split_encoder = True,
-            metric_norm = 2
+            metric_norm = 2,
+            F_I_batch_norm = False,
+            F_V_limit_variance = True,
+            F_multiply = False,
     ):
         self.runing_avg = np.zeros((dim_y, dim_F_I))
+        self.F_multiply = F_multiply
         self.is_training = True
+        self.F_I_batch_norm = F_I_batch_norm
         self.split_encoder = split_encoder
+        self.F_V_limit_variance = F_V_limit_variance
         self.train_bn = train_bn
         self.soft_bn = soft_bn
         self.batch_size = batch_size
@@ -56,11 +62,32 @@ class VDSN(object):
             self.encoder_W2_FV = tf.Variable(tf.random_normal([5, 5, dim_W3, self.dim_W1 - self.dim_F_I], stddev=0.02), name='encoder_W2_FV')
             self.encoder_W3_FI = tf.Variable(tf.random_normal([dim_F_I * 7 * 7, self.dim_F_I], stddev=0.02), name='encoder_W3_FI')
             self.encoder_W3_FV = tf.Variable(tf.random_normal([(self.dim_W1 - self.dim_F_I) * 7 * 7, self.dim_W1 - self.dim_F_I], stddev=0.02), name='encoder_W3_FV')
+            self.encoder_b2_FI = bias_variable([dim_F_I], name='en_b2_FI')
+            self.encoder_b3_FI = bias_variable([dim_F_I], name='en_b3_FI')
+            self.encoder_b2_FV = bias_variable([self.dim_W1 - dim_F_I], name='en_b2_FI')
+            self.encoder_b3_FV = bias_variable([self.dim_W1 - dim_F_I], name='en_b3_FI')
         else:
             self.encoder_W2 = tf.Variable(tf.random_normal([5, 5, dim_W3, dim_W2], stddev=0.02), name='encoder_W2')
             self.encoder_W3 = tf.Variable(tf.random_normal([dim_W2 * 7 * 7, dim_W1], stddev=0.02), name='encoder_W3')
             self.encoder_b2 = bias_variable([dim_W2], name='en_b2')
             self.encoder_b3 = bias_variable([dim_W1], name='en_b3')
+
+        self.dup_encoder_W1 = tf.Variable(tf.random_normal([5, 5, image_shape[-1], dim_W3], stddev=0.02), name='dup_encoder_W1')
+        self.dup_encoder_b1 = bias_variable([dim_W3], name='dup_en_b1')
+        if self.split_encoder:
+            self.dup_encoder_W2_FI = tf.Variable(tf.random_normal([5, 5, dim_W3, dim_F_I], stddev=0.02), name='dup_encoder_W2_FI')
+            self.dup_encoder_W2_FV = tf.Variable(tf.random_normal([5, 5, dim_W3, self.dim_W1 - self.dim_F_I], stddev=0.02), name='dup_encoder_W2_FV')
+            self.dup_encoder_W3_FI = tf.Variable(tf.random_normal([dim_F_I * 7 * 7, self.dim_F_I], stddev=0.02), name='dup_encoder_W3_FI')
+            self.dup_encoder_W3_FV = tf.Variable(tf.random_normal([(self.dim_W1 - self.dim_F_I) * 7 * 7, self.dim_W1 - self.dim_F_I], stddev=0.02), name='dup_encoder_W3_FV')
+            self.dup_encoder_b2_FI = bias_variable([dim_F_I], name='dup_en_b2_FI')
+            self.dup_encoder_b3_FI = bias_variable([dim_F_I], name='dup_en_b3_FI')
+            self.dup_encoder_b2_FV = bias_variable([self.dim_W1 - dim_F_I], name='dup_en_b2_FI')
+            self.dup_encoder_b3_FV = bias_variable([self.dim_W1 - dim_F_I], name='dup_en_b3_FI')
+        else:
+            self.dup_encoder_W2 = tf.Variable(tf.random_normal([5, 5, dim_W3, dim_W2], stddev=0.02), name='dup_encoder_W2')
+            self.dup_encoder_W3 = tf.Variable(tf.random_normal([dim_W2 * 7 * 7, dim_W1], stddev=0.02), name='dup_encoder_W3')
+            self.dup_encoder_b2 = bias_variable([dim_W2], name='dup_en_b2')
+            self.dup_encoder_b3 = bias_variable([dim_W1], name='dup_en_b3')
 
         self.filter_W1 = tf.Variable(tf.random_normal([self.dim_F_I + self.dim_F_V, self.dim_F_V], stddev=0.02), name='filter_W1')
         self.filter_W2 = tf.Variable(tf.random_normal([self.dim_F_V, self.dim_F_V / 2], stddev=0.02), name='filter_W2')
@@ -109,8 +136,19 @@ class VDSN(object):
         image_gen_left_diff = tf.nn.sigmoid(self.generator(F_I_left, F_V_diff, reuse=True))
         image_gen_diff_right = tf.nn.sigmoid(self.generator(F_I_diff, F_V_right, reuse=True))
 
-        F_I_left_gen, _ = self.encoder(image_gen_left_diff, reuse=True)
-        F_I_diff_gen, _ = self.encoder(image_gen_diff_right, reuse=True)
+        F_I_left_gen, _ = self.dup_encoder(image_gen_left_diff, reuse=False)
+        F_I_diff_gen, _ = self.dup_encoder(image_gen_diff_right, reuse=True)
+
+        fix_vars = filter(lambda x: x.name.startswith('fix'), tf.trainable_variables())
+        dup_fix_vars = filter(lambda x: x.name.startswith('dup_fix'), tf.trainable_variables())
+        en_vars = filter(lambda x: x.name.startswith('en'), tf.trainable_variables())
+        dup_en_vars = filter(lambda x: x.name.startswith('dup_en'), tf.trainable_variables())
+        for ix, var in enumerate(en_vars):
+            copy_from_en = tf.assign(dup_en_vars[ix], var.value())
+            tf.add_to_collection("update_dup", copy_from_en)
+        for ix, var in enumerate(fix_vars):
+            copy_from_fix = tf.assign(dup_fix_vars[ix], var.value())
+            tf.add_to_collection("update_dup", copy_from_fix)
 
         F_I_gen_recon_cost = (tf.nn.l2_loss(F_I_left - F_I_left_gen)
                               + tf.nn.l2_loss(F_I_diff - F_I_diff_gen)) / (2 * self.batch_size)
@@ -238,7 +276,7 @@ class VDSN(object):
         summary_merge_recon_img = tf.summary.merge([summary_val_recon_img,summary_F_V_out_diff_stitch_img])
         summary_merge_stitch_img = tf.summary.merge([
             summary_F_IV_out_diff_stitch_img, summary_F_IV_out_same_stitch_img])
-        summary_merge_cluster_img = tf.summary.merge([summary_F_I_cluster_img])
+        summary_merge_cluster_img = tf.summary.merge([summary_F_I_cluster_img, summary_F_V_cluster_img])
         return Y_left, Y_right, Y_diff, image_real_left, image_real_right, image_real_diff, gen_recon_cost, gen_metric_loss, \
                gen_cla_cost, gen_total_cost, image_gen_left, image_gen_right, gen_cla_accuracy, F_I_left, F_V_left, \
                gan_gen_cost, F_IV_recon_cost, gan_dis_total_cost, gan_gen_total_cost, val_recon_img, F_I_cluster_img, F_V_cluster_img, \
@@ -317,8 +355,11 @@ class VDSN(object):
             with tf.name_scope('encoder_conv2_FI'):
                 h_conv2_FI = tf.nn.conv2d(h_pool1, self.encoder_W2_FI, strides=[1, 1, 1, 1],
                                        padding='SAME')  # +self.encoder_b2
-                h_conv2_FI = lrelu(batchnormalize(h_conv2_FI, 'en_bn1_FI', soft=self.soft_bn,
-                                               train=self.is_training, reuse=reuse, valid=self.train_bn))
+                if self.F_I_batch_norm:
+                    h_conv2_FI = lrelu(batchnormalize(h_conv2_FI, 'en_bn1_FI', soft=self.soft_bn,
+                                                   train=self.is_training, reuse=reuse, valid=self.train_bn))
+                else:
+                    h_conv2_FI = lrelu(tcl.layer_norm(h_conv2_FI + self.encoder_b2_FI))
 
             # Second pooling layer.
             with tf.name_scope('encoder_pool2_FI'):
@@ -326,16 +367,18 @@ class VDSN(object):
 
             with tf.name_scope('encoder_fc1_FI'):
                 h_pool2_flat_FI = tf.reshape(h_pool2_FI, [-1, 7 * 7 * self.dim_F_I])
-                h_fc1_FI = batchnormalize(lrelu(tf.matmul(h_pool2_flat_FI, self.encoder_W3_FI))
+                if self.F_I_batch_norm:
+                    h_fc1_FI = batchnormalize(lrelu(tf.matmul(h_pool2_flat_FI, self.encoder_W3_FI))
                                              , 'fix_scale_en_bn3_FI', soft=self.soft_bn,
                                              train=self.is_training, reuse=reuse, valid=self.train_bn)
-
+                else:
+                    h_fc1_FI = tcl.layer_norm(lrelu(tf.matmul(h_pool2_flat_FI, self.encoder_W3_FI) + self.encoder_b3_FI))
 
             # FV: Second convolutional layer -- maps 64 feature maps to 128.
             with tf.name_scope('encoder_conv2_FV'):
                 h_conv2_FV = tf.nn.conv2d(h_pool1, self.encoder_W2_FV, strides=[1, 1, 1, 1],
                                           padding='SAME')  # +self.encoder_b2
-                h_conv2_FV = lrelu(batchnormalize(h_conv2_FI, 'en_bn1_FV', soft=self.soft_bn,
+                h_conv2_FV = lrelu(batchnormalize(h_conv2_FV, 'en_bn1_FV', soft=self.soft_bn,
                                                   train=self.is_training, reuse=reuse, valid=self.train_bn))
 
             # Second pooling layer.
@@ -346,7 +389,7 @@ class VDSN(object):
                 h_pool2_flat_FV = tf.reshape(h_pool2_FV, [-1, 7 * 7 * (self.dim_W2 - self.dim_F_I)])
                 h_fc1_FV = batchnormalize(lrelu(tf.matmul(h_pool2_flat_FV, self.encoder_W3_FV))
                                           , 'fix_scale_en_bn3_FV', soft=self.soft_bn,
-                                          train=self.is_training, reuse=reuse, valid=self.train_bn)
+                                          train=self.is_training, reuse=reuse, valid=self.train_bn, limit_v = self.F_V_limit_variance)
             return h_fc1_FI, h_fc1_FV
         else:
             with tf.name_scope('encoder_conv2'):
@@ -371,6 +414,81 @@ class VDSN(object):
             return batchnormalize(F_I, 'fix_scale_en_bn3', train=self.is_training, reuse=reuse, soft = self.soft_bn),\
                    batchnormalize(F_V,'fix_scale_en_bn4',train=self.is_training,reuse=reuse, soft = self.soft_bn)
 
+    def dup_encoder(self, image, reuse=False):
+
+        # First convolutional layer - maps one grayscale image to 64 feature maps.
+        with tf.name_scope('dup_encoder_conv1'):
+            h_conv1 = lrelu(
+                tf.nn.conv2d(image, self.dup_encoder_W1, strides=[1, 1, 1, 1], padding='SAME') + self.dup_encoder_b1)
+        # First pooling layer - downsamples by 2X.
+        with tf.name_scope('dup_encoder_pool1'):
+            h_pool1 = avg_pool_2x2(h_conv1)
+
+
+        if self.split_encoder:
+            # FI: Second convolutional layer -- maps 64 feature maps to 128.
+            with tf.name_scope('dup_encoder_conv2_FI'):
+                h_conv2_FI = tf.nn.conv2d(h_pool1, self.dup_encoder_W2_FI, strides=[1, 1, 1, 1],
+                                       padding='SAME')  # +self.encoder_b2
+                if self.F_I_batch_norm:
+                    h_conv2_FI = lrelu(batchnormalize(h_conv2_FI, 'dup_en_bn1_FI', soft=self.soft_bn,
+                                                   train=self.is_training, reuse=reuse, valid=self.train_bn))
+                else:
+                    h_conv2_FI = lrelu(tcl.layer_norm(h_conv2_FI) + self.dup_encoder_b2_FI)
+
+            # Second pooling layer.
+            with tf.name_scope('dup_encoder_pool2_FI'):
+                h_pool2_FI = avg_pool_2x2(h_conv2_FI)
+
+            with tf.name_scope('dup_encoder_fc1_FI'):
+                h_pool2_flat_FI = tf.reshape(h_pool2_FI, [-1, 7 * 7 * self.dim_F_I])
+                if self.F_I_batch_norm:
+                    h_fc1_FI = batchnormalize(lrelu(tf.matmul(h_pool2_flat_FI, self.dup_encoder_W3_FI))
+                                             , 'dup_fix_scale_en_bn3_FI', soft=self.soft_bn,
+                                             train=self.is_training, reuse=reuse, valid=self.train_bn)
+                else:
+                    h_fc1_FI = tcl.layer_norm(lrelu(tf.matmul(h_pool2_flat_FI, self.dup_encoder_W3_FI) + self.dup_encoder_b3_FI))
+
+            # FV: Second convolutional layer -- maps 64 feature maps to 128.
+            with tf.name_scope('dup_encoder_conv2_FV'):
+                h_conv2_FV = tf.nn.conv2d(h_pool1, self.dup_encoder_W2_FV, strides=[1, 1, 1, 1],
+                                          padding='SAME')  # +self.encoder_b2
+                h_conv2_FV = lrelu(batchnormalize(h_conv2_FV, 'dup_en_bn1_FV', soft=self.soft_bn,
+                                                  train=self.is_training, reuse=reuse, valid=self.train_bn))
+
+            # Second pooling layer.
+            with tf.name_scope('dup_encoder_pool2_FV'):
+                h_pool2_FV = avg_pool_2x2(h_conv2_FV)
+
+            with tf.name_scope('dup_encoder_fc1_FV'):
+                h_pool2_flat_FV = tf.reshape(h_pool2_FV, [-1, 7 * 7 * (self.dim_W2 - self.dim_F_I)])
+                h_fc1_FV = batchnormalize(lrelu(tf.matmul(h_pool2_flat_FV, self.dup_encoder_W3_FV))
+                                          , 'dup_fix_scale_en_bn3_FV', soft=self.soft_bn,
+                                          train=self.is_training, reuse=reuse, valid=self.train_bn, limit_v = self.F_V_limit_variance)
+            return h_fc1_FI, h_fc1_FV
+        else:
+            with tf.name_scope('dup_encoder_conv2'):
+                h_conv2 = tf.nn.conv2d(h_pool1, self.dup_encoder_W2, strides=[1, 1, 1, 1],
+                                          padding='SAME')  # +self.encoder_b2
+                h_conv2 = lrelu(batchnormalize(h_conv2, 'dup_en_bn1', soft=self.soft_bn,
+                                                  train=self.is_training, reuse=reuse, valid=self.train_bn))
+            # Second pooling layer.
+            with tf.name_scope('dup_encoder_pool2'):
+                h_pool2 = avg_pool_2x2(h_conv2)
+
+            # Fully connected layer 1 -- after 2 round of downsampling, our 28x28 image
+            # is down to 7x7x64 feature maps -- maps this to 1024 features.
+
+            with tf.name_scope('dup_encoder_fc1'):
+                h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * 128])
+                h_fc1 = lrelu(batchnormalize(tf.matmul(h_pool2_flat, self.dup_encoder_W3)  # + self.encoder_b3
+                                             , 'en_bn2', soft = self.soft_bn,
+                                             train=self.is_training, reuse=reuse, valid = self.train_bn))
+
+            F_I, F_V = tf.split(h_fc1, [self.dim_F_I, self.dim_W1 - self.dim_F_I], axis=1)
+            return batchnormalize(F_I, 'dup_fix_scale_en_bn3', train=self.is_training, reuse=reuse, soft = self.soft_bn),\
+                   batchnormalize(F_V,'dup_fix_scale_en_bn4',train=self.is_training,reuse=reuse, soft = self.soft_bn)
+
     def discriminator(self, F_V, reuse=False):
         # 512 to 512
         h1 = lrelu(batchnormalize(tf.matmul(F_V, self.discrim_W1)  # + self.discrim_b1
@@ -380,6 +498,8 @@ class VDSN(object):
         return h2
 
     def generator(self, F_I, F_V, reuse=False):
+        if self.F_multiply:
+            F_V = tf.multiply(F_V , F_I)
         # F_combine 1*128
         F_combine = tf.concat(axis=1, values=[F_I, F_V])
         # h1 1* dim_W2*7*7

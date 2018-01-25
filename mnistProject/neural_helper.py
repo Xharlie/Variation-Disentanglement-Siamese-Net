@@ -62,7 +62,7 @@ def _get_variable(name,
                            trainable=trainable)
 
 
-def batchnormalize(x, name, train=True, reuse=False, valid = True, soft = False):
+def batchnormalize(x, name, train=True, reuse=False, valid = True, soft = False, limit_v = True):
     phase = 'gen'
     if name.startswith('dis'):
         phase = 'adv'
@@ -103,7 +103,8 @@ def batchnormalize(x, name, train=True, reuse=False, valid = True, soft = False)
 
         if (not train) or soft:
             mean, variance = moving_mean, moving_variance
-
+        if not limit_v:
+            return x - mean
         x = tf.nn.batch_normalization(x, mean, variance, beta, gamma, 0.001)
         #x.set_shape(inputs.get_shape()) ??
 
