@@ -154,6 +154,9 @@ parser.add_argument("--F_V_limit_variance", action="store_true",
 parser.add_argument("--F_multiply", action="store_true",
                         help="limit variance for in F_V")
 
+parser.add_argument("--gan_only_filter", action="store_true",
+                        help="fix the encoder, generator and other network in Gans training ")
+
 
 # >==================  F_V_validation args =======================<
 
@@ -224,7 +227,8 @@ VDSN_model = VDSN(
         metric_norm = args.metric_norm,
         F_I_batch_norm = args.F_I_batch_norm,
         F_V_limit_variance = args.F_V_limit_variance,
-        F_multiply = args.F_multiply
+        F_multiply = args.F_multiply,
+        gan_only_filter = args.gan_only_filter
 )
 
 Y_left, Y_right, Y_diff, image_real_left, image_real_right, image_real_diff, gen_recon_cost, gen_metric_loss, \
@@ -263,18 +267,24 @@ else:
     dup_encoder_vars = filter(lambda x: x.name.startswith('dup_en'), tf.trainable_variables())
     filter_vars = filter(lambda x: x.name.startswith('fil') and 'bn' not in x.name, tf.trainable_variables())
 
-fix_vars = filter_vars = filter(lambda x: x.name.startswith('fix'), tf.trainable_variables())
-dup_fix_vars = filter_vars = filter(lambda x: x.name.startswith('dup_fix'), tf.trainable_variables())
+# fix_vars = filter(lambda x: x.name.startswith('fix'), tf.trainable_variables())
+# dup_fix_vars = filter(lambda x: x.name.startswith('dup_fix'), tf.trainable_variables())
 
 with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
     train_op_gen = tf.train.AdamOptimizer(
         gen_learning_rate, beta1=0.5).minimize(
         gen_total_cost, var_list=gen_vars+encoder_vars+cla_vars, global_step=global_step)
 
-with tf.control_dependencies(tf.get_collection(GEN_BATCH_NORM_OPS)):
+gan_collection = tf.get_collection(GAN_GEN_BATCH_NORM_OPS)
+if not args.gan_only_filter:
+    gan_collection = tf.get_collection(GEN_BATCH_NORM_OPS) + gan_collection
+with tf.control_dependencies(gan_collection):
+    var_list = filter_vars
+    if not args.gan_only_filter:
+        var_list = gen_vars + encoder_vars + cla_vars + filter_vars
     train_op_gan_gen = tf.train.AdamOptimizer(
         gan_learning_rate, beta1=0.5).minimize(
-        gan_gen_total_cost, var_list=gen_vars+encoder_vars+cla_vars+filter_vars, global_step=global_step)
+        gan_gen_total_cost, var_list=var_list, global_step=global_step)
 
 with tf.control_dependencies(tf.get_collection(DIS_BATCH_NORM_OPS)):
     # not update global step since we considered gan as a whole step
@@ -287,7 +297,7 @@ save_path=""
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-center_init = True;
+center_init = True
 
 def resetIndex():
     start = 0
@@ -333,6 +343,7 @@ with sess.as_default():
         if (len(args.pretrain_model)>0):
             # Create a saver. include gen_vars and encoder_vars
             saver.restore(sess, args.pretrain_model)
+            print sess.run(global_step)
         elif (len(args.pretrain_model_wo_lr)>0):
             # Create a saver. include gen_vars and encoder_vars
             pretrain_saver = tf.train.Saver(gen_vars + encoder_vars + cla_vars)

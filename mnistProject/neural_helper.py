@@ -6,6 +6,7 @@ from tensorflow.python.ops import control_flow_ops
 BATCH_NORM_OPS_BASE = '_bn_update_ops'
 ADV_BATCH_NORM_OPS = 'adv_bn_update_ops'
 GEN_BATCH_NORM_OPS = 'gen_bn_update_ops'
+GAN_GEN_BATCH_NORM_OPS = 'gan_gen_bn_update_ops'
 DIS_BATCH_NORM_OPS = 'dis_bn_update_ops'
 
 def bias_variable(shape, name=None):
@@ -68,6 +69,8 @@ def batchnormalize(x, name, train=True, reuse=False, valid = True, soft = False,
         phase = 'adv'
     elif name.startswith('gan_dis'):
         phase = 'dis'
+    elif name.startswith('filter'):
+        phase = 'gan_gen'
     with tf.variable_scope(name, reuse=reuse):
         x_shape = x.get_shape()
         params_shape = x_shape[-1:]

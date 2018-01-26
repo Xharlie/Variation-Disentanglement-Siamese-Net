@@ -27,9 +27,11 @@ class VDSN(object):
             F_I_batch_norm = False,
             F_V_limit_variance = True,
             F_multiply = False,
+            gan_only_filter = False
     ):
         self.runing_avg = np.zeros((dim_y, dim_F_I))
         self.F_multiply = F_multiply
+        self.gan_only_filter = gan_only_filter
         self.is_training = True
         self.F_I_batch_norm = F_I_batch_norm
         self.split_encoder = split_encoder
@@ -232,9 +234,10 @@ class VDSN(object):
                            tf.nn.l2_loss(F_V_right - F_IV_left_right)) / (3 * self.batch_size)
 
         gan_dis_total_cost = gan_dis_cost + gen_regularizer_weight * gan_dis_regularization_loss
-
-        gan_gen_total_cost = gen_total_cost + gan_gen_weight * gan_gen_cost + F_IV_recon_weight * F_IV_recon_cost + \
-                         gen_regularizer_weight * gan_filter_regularization_loss
+        gan_gen_total_cost = gan_gen_weight * gan_gen_cost + F_IV_recon_weight * F_IV_recon_cost + \
+                             gen_regularizer_weight * gan_filter_regularization_loss
+        if not self.gan_only_filter:
+            gan_gen_total_cost += gen_total_cost
 
         val_recon_img = tf.placeholder(tf.float32, [None, self.image_shape[0] * int(math.ceil(self.batch_size ** (.5))),
                  self.image_shape[1] * 3 * int(math.ceil(self.batch_size / math.ceil(self.batch_size ** (.5)))), 3])
@@ -297,7 +300,7 @@ class VDSN(object):
         with tf.name_scope('filter_fc3'):
             h_fc3 = batchnormalize(lrelu(tf.matmul(h_fc2, self.filter_W3))
                                          , 'filter_bn3', soft=self.soft_bn, train=self.is_training,
-                                         reuse=reuse, valid=self.train_bn)
+                                         reuse=reuse, valid=self.train_bn, limit_v=self.F_V_limit_variance)
         return h_fc3
 
 

@@ -89,5 +89,16 @@ nohup python -u train.py --F_V_limit_variance --F_multiply --recon_epoch 100 --g
 nohup python -u train.py --F_multiply --recon_epoch 100 --gan_epoch 500 --avg_momentum 0.05 --drawing_epoch 5 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --gan_decay_step 10000 --gan_decay_rate 0.99 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 2 --F_IV_recon_weight 1 --F_I_gen_recon_weight 2 --F_V_validation_test_batch_size 64 &> train.100.500.central.momen0.05_bntrue_splitencoder_metric10_cla5_gan2_ivrecon_1_irecon_2_dup_layer_notVariance_F_multiply &
 2018-01-24-23-39-20    dup + F_I layernorm + F_V no variance + F_multiply
 
-
 tensorboard --logdir=nodup:2018-01-24-14-45-04,dup:2018-01-24-23-34-32,dup-F_Ilayernorm:2018-01-24-23-37-04,dup-F_Ilayernorm-F_Vnovariance:2018-01-24-23-37-48,dup-F_Ilayernorm-F_multiply:2018-01-24-23-38-58,dup-F_Ilayernorm-F_Vnovariance-F_multiply:2018-01-24-23-39-20 --port 6008
+
+---------------------- gan only -----------------------------
+92285
+
+dup + F_I layernorm + F_V no variance base, gan_only_filter
+nohup python -u train.py --pretrain_model model_treasury/2018-01-24-23-37-48/model.ckpt-92285 --gan_only_filter --recon_epoch 0 --gan_epoch 500 --avg_momentum 0.05 --drawing_epoch 5 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --gan_decay_step 10000 --gan_decay_rate 0.99 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 2 --F_IV_recon_weight 1 --F_I_gen_recon_weight 2 --F_V_validation_test_batch_size 64 &> train.00.500.central.momen0.05_bntrue_splitencoder_metric10_cla5_gan2_ivrecon_1_irecon_2_dup_layer_notVariance_onlyfilter &
+2018-01-25-21-58-19
+
+
+dup + F_I layernorm + F_V no variance base
+nohup python -u train.py --pretrain_model model_treasury/2018-01-24-23-37-48/model.ckpt-92285 --recon_epoch 0 --gan_epoch 500 --avg_momentum 0.05 --drawing_epoch 5 --clustering_tsb --metric_obj_func central --train_bn --gen_start_learning_rate 0.001 --gen_decay_step 10000 --gen_decay_rate 0.99 --batch_size 64 --validate_disentanglement --gan_decay_step 10000 --gan_decay_rate 0.99 --gen_metric_loss_weight 10 --gen_cla_weight 5 --gan_gen_weight 2 --F_IV_recon_weight 1 --F_I_gen_recon_weight 2 --F_V_validation_test_batch_size 64 &> train.00.500.central.momen0.05_bntrue_splitencoder_metric10_cla5_gan2_ivrecon_1_irecon_2_dup_layer_notVariance &
+2018-01-25-21-59-21
